@@ -1,0 +1,10 @@
+{
+  "domain": "ha_health_record",
+  "name": "Ha Health Record",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["frontend"],
+  "iot_class": "local_push",
+  "requirements": [],
+  "version": "1.4.0"
+}

@@ -1,0 +1,94 @@
+{
+  "entity": {
+    "button": {
+      "activity_log": {
+        "name": "{activity_name} Log"
+      }
+    },
+    "number": {
+      "activity_amount": {
+        "name": "{activity_name} Amount"
+      },
+      "growth_input": {
+        "name": "{growth_name} Input"
+      }
+    },
+    "text": {
+      "activity_note": {
+        "name": "{activity_name} Note"
+      }
+    },
+    "sensor": {
+      "activity_record": {
+        "name": "{activity_name} Record"
+      },
+      "growth_record": {
+        "name": "{growth_name} Record"
+      }
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add Family Member",
+        "description": "Add a new family member to track health records.",
+        "data": {
+          "member_name": "Name",
+          "member_id": "ID (unique identifier)"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "This member is already configured."
+    },
+    "abort": {
+      "already_configured": "This member is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Manage Sets",
+        "menu_options": {
+          "add_activity": "Add Activity Set",
+          "add_growth": "Add Growth Set",
+          "manage_sets": "Manage Existing Sets"
+        }
+      },
+      "add_activity": {
+        "title": "Add Activity Set",
+        "description": "Select an activity type to track.",
+        "data": {
+          "activity_type": "Activity Type",
+          "activity_name": "Custom Name",
+          "activity_unit": "Custom Unit"
+        }
+      },
+      "add_growth": {
+        "title": "Add Growth Set",
+        "description": "Select a growth measurement to track.",
+        "data": {
+          "growth_type": "Growth Type",
+          "growth_name": "Custom Name",
+          "growth_unit": "Custom Unit"
+        }
+      },
+      "manage_sets": {
+        "title": "Manage Existing Sets",
+        "description": "Activity sets: {count_activity}, Growth sets: {count_growth}. Select sets to delete.",
+        "data": {
+          "delete_sets": "Select sets to delete"
+        }
+      }
+    },
+    "error": {
+      "invalid_type": "Invalid type selected.",
+      "duplicate_set": "This set already exists.",
+      "required_name": "Name is required for custom type.",
+      "invalid_name": "Name must contain at least one alphanumeric character."
+    },
+    "abort": {
+      "no_sets": "No sets to manage."
+    }
+  }
+}

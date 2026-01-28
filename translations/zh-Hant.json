@@ -1,0 +1,94 @@
+{
+  "entity": {
+    "button": {
+      "activity_log": {
+        "name": "{activity_name} 紀錄"
+      }
+    },
+    "number": {
+      "activity_amount": {
+        "name": "{activity_name} 數值"
+      },
+      "growth_input": {
+        "name": "{growth_name} 輸入"
+      }
+    },
+    "text": {
+      "activity_note": {
+        "name": "{activity_name} 備註"
+      }
+    },
+    "sensor": {
+      "activity_record": {
+        "name": "{activity_name} 紀錄"
+      },
+      "growth_record": {
+        "name": "{growth_name} 紀錄"
+      }
+    }
+  },
+  "config": {
+    "step": {
+      "user": {
+        "title": "新增家庭成員",
+        "description": "新增一位家庭成員來追蹤健康紀錄。",
+        "data": {
+          "member_name": "名稱",
+          "member_id": "ID（唯一識別碼）"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "此成員已經設定過了。"
+    },
+    "abort": {
+      "already_configured": "此成員已經設定過了。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "管理套組",
+        "menu_options": {
+          "add_activity": "新增活動套組",
+          "add_growth": "新增生長套組",
+          "manage_sets": "管理現有套組"
+        }
+      },
+      "add_activity": {
+        "title": "新增活動套組",
+        "description": "選擇要追蹤的活動類型。",
+        "data": {
+          "activity_type": "活動類型",
+          "activity_name": "自訂名稱",
+          "activity_unit": "自訂單位"
+        }
+      },
+      "add_growth": {
+        "title": "新增生長套組",
+        "description": "選擇要追蹤的生長測量。",
+        "data": {
+          "growth_type": "生長類型",
+          "growth_name": "自訂名稱",
+          "growth_unit": "自訂單位"
+        }
+      },
+      "manage_sets": {
+        "title": "管理現有套組",
+        "description": "活動套組：{count_activity} 個，生長套組：{count_growth} 個。選擇要刪除的套組。",
+        "data": {
+          "delete_sets": "選擇要刪除的套組"
+        }
+      }
+    },
+    "error": {
+      "invalid_type": "選擇的類型無效。",
+      "duplicate_set": "此套組已經存在。",
+      "required_name": "自訂類型必須輸入名稱。",
+      "invalid_name": "名稱必須包含至少一個英數字元。"
+    },
+    "abort": {
+      "no_sets": "沒有套組可以管理。"
+    }
+  }
+}
