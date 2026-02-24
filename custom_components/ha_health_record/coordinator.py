@@ -263,30 +263,6 @@ class HealthRecordCoordinator:
         if activity_type in self.activity_sets:
             self.activity_sets[activity_type].current_note = note
 
-    async def async_log_activity(self, activity_type: str) -> ActivityRecord | None:
-        """Log an activity and return the record."""
-        if activity_type not in self.activity_sets:
-            return None
-
-        activity_set = self.activity_sets[activity_type]
-        record = ActivityRecord(
-            amount=activity_set.current_amount,
-            note=activity_set.current_note,
-            timestamp=dt_util.now(),
-        )
-        activity_set.last_record = record
-
-        # Save to storage
-        await self._async_save()
-
-        # Notify sensor to update
-        async_dispatcher_send(
-            self.hass,
-            signal_activity_updated(self.member_id, activity_type),
-        )
-
-        return record
-
     @callback
     def log_activity(self, activity_type: str, timestamp: datetime | None = None) -> ActivityRecord | None:
         """Log an activity and return the record (sync wrapper)."""
@@ -319,32 +295,6 @@ class HealthRecordCoordinator:
         async_dispatcher_send(
             self.hass,
             signal_activity_updated(self.member_id, activity_type),
-        )
-
-        return record
-
-    async def async_set_growth_value(
-        self, growth_type: str, value: float | None
-    ) -> GrowthRecord | None:
-        """Set the value for a growth measurement and return the record."""
-        if growth_type not in self.growth_sets:
-            return None
-
-        growth_set = self.growth_sets[growth_type]
-        growth_set.current_value = value
-        record = GrowthRecord(
-            value=value,
-            timestamp=dt_util.now(),
-        )
-        growth_set.last_record = record
-
-        # Save to storage
-        await self._async_save()
-
-        # Notify sensor to update
-        async_dispatcher_send(
-            self.hass,
-            signal_growth_updated(self.member_id, growth_type),
         )
 
         return record
