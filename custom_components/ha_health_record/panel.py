@@ -85,7 +85,7 @@ async def async_unload_panel(hass: HomeAssistant) -> None:
 
 def valid_float(value: Any) -> float:
     """Validate float, rejecting NaN and Infinity."""
-    result = valid_float(value)
+    result = vol.Coerce(float)(value)
     if math.isnan(result) or math.isinf(result):
         raise vol.Invalid("NaN and Infinity are not allowed")
     return result
