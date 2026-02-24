@@ -1,6 +1,7 @@
 """Config flow for Ha Health Record integration."""
 from __future__ import annotations
 
+import copy
 import logging
 import re
 from typing import Any
@@ -10,10 +11,10 @@ import voluptuous as vol
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
-    OptionsFlowWithConfigEntry,
+    ConfigFlowResult,
+    OptionsFlow,
 )
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 
 from .const import (
@@ -35,6 +36,9 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Label for the custom type option in dropdowns
+CUSTOM_TYPE_LABEL = "Custom..."
+
 
 def _sanitize_id(name: str) -> str:
     """Sanitize a name to create a valid ID."""
@@ -48,28 +52,33 @@ class HaHealthRecordConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the initial step - add a family member."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             member_id = user_input[CONF_MEMBER_ID]
 
-            # Check if member already exists
-            await self.async_set_unique_id(member_id)
-            self._abort_if_unique_id_configured()
+            # Validate member_id produces a usable sanitized ID
+            sanitized_id = _sanitize_id(member_id)
+            if not sanitized_id:
+                errors[CONF_MEMBER_ID] = "invalid_id"
+            else:
+                # Use the sanitized ID as the unique ID
+                await self.async_set_unique_id(sanitized_id)
+                self._abort_if_unique_id_configured()
 
-            return self.async_create_entry(
-                title=user_input[CONF_MEMBER_NAME],
-                data={
-                    CONF_MEMBER_ID: member_id,
-                    CONF_MEMBER_NAME: user_input[CONF_MEMBER_NAME],
-                },
-                options={
-                    CONF_ACTIVITY_SETS: [],
-                    CONF_GROWTH_SETS: [],
-                },
-            )
+                return self.async_create_entry(
+                    title=user_input[CONF_MEMBER_NAME],
+                    data={
+                        CONF_MEMBER_ID: sanitized_id,
+                        CONF_MEMBER_NAME: user_input[CONF_MEMBER_NAME],
+                    },
+                    options={
+                        CONF_ACTIVITY_SETS: [],
+                        CONF_GROWTH_SETS: [],
+                    },
+                )
 
         return self.async_show_form(
             step_id="user",
@@ -84,28 +93,30 @@ class HaHealthRecordConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlowWithConfigEntry:
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> HaHealthRecordOptionsFlow:
         """Get the options flow for this handler."""
-        return HaHealthRecordOptionsFlow(config_entry)
+        return HaHealthRecordOptionsFlow()
 
 
-class HaHealthRecordOptionsFlow(OptionsFlowWithConfigEntry):
+class HaHealthRecordOptionsFlow(OptionsFlow):
     """Handle options flow for Ha Health Record."""
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize options flow."""
-        super().__init__(config_entry)
-        self._activity_sets: list[dict[str, Any]] = list(
-            config_entry.options.get(CONF_ACTIVITY_SETS, [])
-        )
-        self._growth_sets: list[dict[str, Any]] = list(
-            config_entry.options.get(CONF_GROWTH_SETS, [])
-        )
+    _activity_sets: list[dict[str, Any]]
+    _growth_sets: list[dict[str, Any]]
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manage the options - main menu."""
+        # Deep copy options to avoid mutating the live config entry data
+        self._activity_sets = copy.deepcopy(
+            list(self.config_entry.options.get(CONF_ACTIVITY_SETS, []))
+        )
+        self._growth_sets = copy.deepcopy(
+            list(self.config_entry.options.get(CONF_GROWTH_SETS, []))
+        )
         return self.async_show_menu(
             step_id="init",
             menu_options=["add_activity", "add_growth", "manage_sets"],
@@ -113,7 +124,7 @@ class HaHealthRecordOptionsFlow(OptionsFlowWithConfigEntry):
 
     async def async_step_add_activity(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Add a new activity set."""
         errors: dict[str, str] = {}
 
@@ -164,7 +175,7 @@ class HaHealthRecordOptionsFlow(OptionsFlowWithConfigEntry):
             for t in DEFAULT_ACTIVITY_TYPES
         ]
         activity_options.append(
-            selector.SelectOptionDict(value=CUSTOM_TYPE, label="Custom...")
+            selector.SelectOptionDict(value=CUSTOM_TYPE, label=CUSTOM_TYPE_LABEL)
         )
 
         return self.async_show_form(
@@ -186,7 +197,7 @@ class HaHealthRecordOptionsFlow(OptionsFlowWithConfigEntry):
 
     async def async_step_add_growth(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Add a new growth set."""
         errors: dict[str, str] = {}
 
@@ -237,7 +248,7 @@ class HaHealthRecordOptionsFlow(OptionsFlowWithConfigEntry):
             for t in DEFAULT_GROWTH_TYPES
         ]
         growth_options.append(
-            selector.SelectOptionDict(value=CUSTOM_TYPE, label="Custom...")
+            selector.SelectOptionDict(value=CUSTOM_TYPE, label=CUSTOM_TYPE_LABEL)
         )
 
         return self.async_show_form(
@@ -259,13 +270,17 @@ class HaHealthRecordOptionsFlow(OptionsFlowWithConfigEntry):
 
     async def async_step_manage_sets(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manage existing sets - show list and allow deletion."""
         if user_input is not None:
             # Process deletions
             sets_to_delete = user_input.get("delete_sets", [])
             for set_id in sets_to_delete:
-                set_type, set_name = set_id.split(":", 1)
+                parts = set_id.split(":", 1)
+                if len(parts) != 2:
+                    _LOGGER.warning("Skipping malformed set_id: %s", set_id)
+                    continue
+                set_type, set_name = parts
                 if set_type == "activity":
                     self._activity_sets = [
                         s for s in self._activity_sets
@@ -318,10 +333,9 @@ class HaHealthRecordOptionsFlow(OptionsFlowWithConfigEntry):
             },
         )
 
-    async def _save_options(self) -> FlowResult:
+    async def _save_options(self) -> ConfigFlowResult:
         """Save the options and create entry."""
         return self.async_create_entry(
-            title="",
             data={
                 CONF_ACTIVITY_SETS: self._activity_sets,
                 CONF_GROWTH_SETS: self._growth_sets,
