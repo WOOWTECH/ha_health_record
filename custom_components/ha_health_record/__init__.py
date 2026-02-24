@@ -48,10 +48,15 @@ async def async_setup_entry(
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS_LIST)
 
-    # Set up panel only once (for the first entry)
+    # Set up panel only once (for the first entry).
+    # Set flag before awaiting to prevent concurrent entries from double-registering.
     if not hass.data.get(_KEY_PANEL_REGISTERED):
-        await async_setup_panel(hass)
         hass.data[_KEY_PANEL_REGISTERED] = True
+        try:
+            await async_setup_panel(hass)
+        except Exception:
+            hass.data[_KEY_PANEL_REGISTERED] = False
+            raise
 
     entry.async_on_unload(entry.add_update_listener(async_update_options))
 
