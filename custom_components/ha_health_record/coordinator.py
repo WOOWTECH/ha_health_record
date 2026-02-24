@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -289,6 +290,7 @@ class HealthRecordCoordinator:
 
         # Add to records history
         self.activity_records.append({
+            "id": uuid.uuid4().hex,
             "activity_type": activity_type,
             "activity_name": activity_set.name,
             "amount": activity_set.current_amount,
@@ -327,6 +329,7 @@ class HealthRecordCoordinator:
 
         # Add to records history
         self.growth_records.append({
+            "id": uuid.uuid4().hex,
             "growth_type": growth_type,
             "growth_name": growth_set.name,
             "value": value,
@@ -363,7 +366,7 @@ class HealthRecordCoordinator:
             try:
                 record_time = dt_util.parse_datetime(record["timestamp"])
                 if record_time and start_time <= record_time <= end_time:
-                    records.append({
+                    entry = {
                         "member_id": self.member_id,
                         "member_name": self.member_name,
                         "type": "activity",
@@ -373,7 +376,10 @@ class HealthRecordCoordinator:
                         "unit": record["unit"],
                         "note": record.get("note", ""),
                         "timestamp": record["timestamp"],
-                    })
+                    }
+                    if "id" in record:
+                        entry["id"] = record["id"]
+                    records.append(entry)
             except (ValueError, TypeError):
                 continue
 
@@ -382,7 +388,7 @@ class HealthRecordCoordinator:
             try:
                 record_time = dt_util.parse_datetime(record["timestamp"])
                 if record_time and start_time <= record_time <= end_time:
-                    records.append({
+                    entry = {
                         "member_id": self.member_id,
                         "member_name": self.member_name,
                         "type": "growth",
@@ -392,50 +398,81 @@ class HealthRecordCoordinator:
                         "unit": record["unit"],
                         "note": record.get("note", ""),
                         "timestamp": record["timestamp"],
-                    })
+                    }
+                    if "id" in record:
+                        entry["id"] = record["id"]
+                    records.append(entry)
             except (ValueError, TypeError):
                 continue
 
         return records
 
-    def delete_record(self, record_type: str, type_id: str, timestamp: str) -> bool:
-        """Delete a record by type and timestamp."""
-        if record_type == "activity":
-            for i, record in enumerate(self.activity_records):
-                if record["activity_type"] == type_id and record["timestamp"] == timestamp:
-                    del self.activity_records[i]
-                    self._async_schedule_save()
-                    return True
-        elif record_type == "growth":
-            for i, record in enumerate(self.growth_records):
-                if record["growth_type"] == type_id and record["timestamp"] == timestamp:
-                    del self.growth_records[i]
-                    self._async_schedule_save()
-                    return True
+    def delete_record(
+        self,
+        record_type: str,
+        type_id: str,
+        timestamp: str,
+        record_id: str | None = None,
+    ) -> bool:
+        """Delete a record by UUID or type+timestamp fallback."""
+        records = (
+            self.activity_records if record_type == "activity"
+            else self.growth_records if record_type == "growth"
+            else None
+        )
+        if records is None:
+            return False
+
+        type_key = "activity_type" if record_type == "activity" else "growth_type"
+        for i, record in enumerate(records):
+            # Match by UUID first (new records), fall back to timestamp (legacy)
+            if record_id and record.get("id") == record_id:
+                del records[i]
+                self._async_schedule_save()
+                return True
+            if not record_id and record[type_key] == type_id and record["timestamp"] == timestamp:
+                del records[i]
+                self._async_schedule_save()
+                return True
         return False
 
-    def update_record(self, record_type: str, type_id: str, timestamp: str, amount: float | None = None, note: str | None = None, new_timestamp: str | None = None) -> bool:
-        """Update a record by type and timestamp."""
-        if record_type == "activity":
-            for record in self.activity_records:
-                if record["activity_type"] == type_id and record["timestamp"] == timestamp:
-                    if amount is not None:
-                        record["amount"] = amount
-                    if note is not None:
-                        record["note"] = note
-                    if new_timestamp is not None:
-                        record["timestamp"] = new_timestamp
-                    self._async_schedule_save()
-                    return True
-        elif record_type == "growth":
-            for record in self.growth_records:
-                if record["growth_type"] == type_id and record["timestamp"] == timestamp:
-                    if amount is not None:
-                        record["value"] = amount
-                    if note is not None:
-                        record["note"] = note
-                    if new_timestamp is not None:
-                        record["timestamp"] = new_timestamp
-                    self._async_schedule_save()
-                    return True
+    def update_record(
+        self,
+        record_type: str,
+        type_id: str,
+        timestamp: str,
+        amount: float | None = None,
+        note: str | None = None,
+        new_timestamp: str | None = None,
+        record_id: str | None = None,
+    ) -> bool:
+        """Update a record by UUID or type+timestamp fallback."""
+        records = (
+            self.activity_records if record_type == "activity"
+            else self.growth_records if record_type == "growth"
+            else None
+        )
+        if records is None:
+            return False
+
+        type_key = "activity_type" if record_type == "activity" else "growth_type"
+        value_key = "amount" if record_type == "activity" else "value"
+
+        for record in records:
+            # Match by UUID first (new records), fall back to timestamp (legacy)
+            matched = False
+            if record_id and record.get("id") == record_id:
+                matched = True
+            elif not record_id and record[type_key] == type_id and record["timestamp"] == timestamp:
+                matched = True
+
+            if matched:
+                if amount is not None:
+                    record[value_key] = amount
+                if note is not None:
+                    record["note"] = note
+                if new_timestamp is not None:
+                    record["timestamp"] = new_timestamp
+                self._async_schedule_save()
+                return True
         return False

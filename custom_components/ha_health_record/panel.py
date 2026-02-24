@@ -337,6 +337,7 @@ def ws_update_growth(
         vol.Required("record_type"): str,  # "activity" or "growth"
         vol.Required("type_id"): str,  # activity_type or growth_type
         vol.Required("timestamp"): str,  # ISO format to identify the record
+        vol.Optional("record_id"): str,  # UUID – preferred over timestamp
         vol.Optional("amount"): vol.Coerce(float),
         vol.Optional("value"): vol.Coerce(float),
         vol.Optional("note"): str,
@@ -354,6 +355,7 @@ def ws_update_record(
     record_type = msg["record_type"]
     type_id = msg["type_id"]
     timestamp = msg["timestamp"]
+    record_id = msg.get("record_id")
 
     # Find the coordinator
     coordinator = None
@@ -371,7 +373,11 @@ def ws_update_record(
     note = msg.get("note")
     new_timestamp = msg.get("new_timestamp")
 
-    if coordinator.update_record(record_type, type_id, timestamp, amount=amount, note=note, new_timestamp=new_timestamp):
+    if coordinator.update_record(
+        record_type, type_id, timestamp,
+        amount=amount, note=note, new_timestamp=new_timestamp,
+        record_id=record_id,
+    ):
         connection.send_result(msg["id"], {"success": True})
     else:
         connection.send_error(msg["id"], "record_not_found", "Record not found")
@@ -384,6 +390,7 @@ def ws_update_record(
         vol.Required("record_type"): str,
         vol.Required("type_id"): str,
         vol.Required("timestamp"): str,
+        vol.Optional("record_id"): str,  # UUID – preferred over timestamp
     }
 )
 @callback
@@ -397,6 +404,7 @@ def ws_delete_record(
     record_type = msg["record_type"]
     type_id = msg["type_id"]
     timestamp = msg["timestamp"]
+    record_id = msg.get("record_id")
 
     # Find the coordinator
     coordinator = None
@@ -409,7 +417,7 @@ def ws_delete_record(
         connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
         return
 
-    if coordinator.delete_record(record_type, type_id, timestamp):
+    if coordinator.delete_record(record_type, type_id, timestamp, record_id=record_id):
         connection.send_result(msg["id"], {"success": True})
     else:
         connection.send_error(msg["id"], "record_not_found", "Record not found")
