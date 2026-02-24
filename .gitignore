@@ -8,3 +8,4 @@ node_modules/
 venv/
 *.log
 .DS_Store
+.claude
