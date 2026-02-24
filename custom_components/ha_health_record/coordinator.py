@@ -174,7 +174,10 @@ class HealthRecordCoordinator:
 
         # Storage - unique per member
         self._store: Store[dict[str, Any]] = Store(
-            hass, STORAGE_VERSION, f"{STORAGE_KEY}_{self.member_id}"
+            hass,
+            STORAGE_VERSION,
+            f"{STORAGE_KEY}_{self.member_id}",
+            atomic_writes=True,
         )
 
         # Activity sets
