@@ -33,6 +33,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 SAVE_DELAY = 1  # seconds – batches rapid operations into a single write
+MAX_RECORDS = 10_000  # per record list – oldest records are pruned beyond this limit
 
 
 def signal_activity_updated(member_id: str, activity_type: str) -> str:
@@ -254,6 +255,19 @@ class HealthRecordCoordinator:
             "growth_records": self.growth_records,
         }
 
+    def _prune_records(self, records: list[dict[str, Any]], label: str) -> None:
+        """Remove oldest records if the list exceeds MAX_RECORDS."""
+        overflow = len(records) - MAX_RECORDS
+        if overflow > 0:
+            del records[:overflow]
+            _LOGGER.warning(
+                "Pruned %d oldest %s record(s) for member %s (limit %d)",
+                overflow,
+                label,
+                self.member_id,
+                MAX_RECORDS,
+            )
+
     def get_device_info(self) -> DeviceInfo:
         """Return device info for this member."""
         return DeviceInfo(
@@ -298,6 +312,7 @@ class HealthRecordCoordinator:
             "note": activity_set.current_note,
             "timestamp": record_timestamp.isoformat(),
         })
+        self._prune_records(self.activity_records, "activity")
 
         # Schedule save
         self._async_schedule_save()
@@ -337,6 +352,7 @@ class HealthRecordCoordinator:
             "note": note,
             "timestamp": record_timestamp.isoformat(),
         })
+        self._prune_records(self.growth_records, "growth")
 
         # Schedule save
         self._async_schedule_save()
