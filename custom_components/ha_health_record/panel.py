@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from datetime import datetime
 from pathlib import Path
@@ -11,9 +12,11 @@ import voluptuous as vol
 
 from homeassistant.components import websocket_api, frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 
 from .const import DOMAIN
+from .coordinator import HealthRecordCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,16 +83,20 @@ async def async_unload_panel(hass: HomeAssistant) -> None:
         _LOGGER.info("Unregistered Ha Health Record panel")
 
 
-def _get_coordinators(hass: HomeAssistant) -> list:
-    """Get all coordinators, filtering out non-coordinator entries."""
-    coordinators = []
-    for key, value in hass.data.get(DOMAIN, {}).items():
-        # Skip internal keys like _panel_setup
-        if isinstance(key, str) and key.startswith("_"):
-            continue
-        # Check if it's a coordinator (has member_id attribute)
-        if hasattr(value, "member_id"):
-            coordinators.append(value)
+def valid_float(value: Any) -> float:
+    """Validate float, rejecting NaN and Infinity."""
+    result = valid_float(value)
+    if math.isnan(result) or math.isinf(result):
+        raise vol.Invalid("NaN and Infinity are not allowed")
+    return result
+
+
+def _get_coordinators(hass: HomeAssistant) -> list[HealthRecordCoordinator]:
+    """Get all coordinators from loaded config entries."""
+    coordinators: list[HealthRecordCoordinator] = []
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if entry.state is ConfigEntryState.LOADED:
+            coordinators.append(entry.runtime_data)
     return coordinators
 
 
@@ -183,7 +190,7 @@ def ws_get_records(
         vol.Required("type"): "ha_health_record/log_activity",
         vol.Required("member_id"): str,
         vol.Required("activity_type"): str,
-        vol.Required("amount"): vol.Coerce(float),
+        vol.Required("amount"): valid_float,
         vol.Optional("note", default=""): str,
         vol.Optional("timestamp"): str,
     }
@@ -258,7 +265,7 @@ def ws_log_activity(
         vol.Required("type"): "ha_health_record/update_growth",
         vol.Required("member_id"): str,
         vol.Required("growth_type"): str,
-        vol.Required("value"): vol.Coerce(float),
+        vol.Required("value"): valid_float,
         vol.Optional("note", default=""): str,
         vol.Optional("timestamp"): str,
     }
@@ -334,12 +341,12 @@ def ws_update_growth(
     {
         vol.Required("type"): "ha_health_record/update_record",
         vol.Required("member_id"): str,
-        vol.Required("record_type"): str,  # "activity" or "growth"
+        vol.Required("record_type"): vol.In(["activity", "growth"]),
         vol.Required("type_id"): str,  # activity_type or growth_type
         vol.Required("timestamp"): str,  # ISO format to identify the record
         vol.Optional("record_id"): str,  # UUID – preferred over timestamp
-        vol.Optional("amount"): vol.Coerce(float),
-        vol.Optional("value"): vol.Coerce(float),
+        vol.Optional("amount"): valid_float,
+        vol.Optional("value"): valid_float,
         vol.Optional("note"): str,
         vol.Optional("new_timestamp"): str,  # New timestamp if editing time
     }
@@ -387,7 +394,7 @@ def ws_update_record(
     {
         vol.Required("type"): "ha_health_record/delete_record",
         vol.Required("member_id"): str,
-        vol.Required("record_type"): str,
+        vol.Required("record_type"): vol.In(["activity", "growth"]),
         vol.Required("type_id"): str,
         vol.Required("timestamp"): str,
         vol.Optional("record_id"): str,  # UUID – preferred over timestamp
@@ -433,7 +440,7 @@ def ws_delete_record(
         vol.Required("member_id"): str,
         vol.Required("name"): str,
         vol.Required("unit"): str,
-        vol.Optional("default_amount", default=0): vol.Coerce(float),
+        vol.Optional("default_amount", default=0): valid_float,
     }
 )
 @websocket_api.async_response
@@ -451,6 +458,10 @@ async def ws_add_activity_type(
     # Generate type_id from name (sanitize)
     type_id = name.lower().replace(" ", "_").replace("-", "_")
     type_id = "".join(c for c in type_id if c.isalnum() or c == "_")
+
+    if not type_id:
+        connection.send_error(msg["id"], "invalid_type_id", "Name must contain at least one alphanumeric character")
+        return
 
     # Find the config entry for this member
     entry = None
@@ -499,7 +510,7 @@ async def ws_add_activity_type(
         vol.Required("type_id"): str,
         vol.Required("name"): str,
         vol.Required("unit"): str,
-        vol.Optional("default_amount"): vol.Coerce(float),
+        vol.Optional("default_amount"): valid_float,
     }
 )
 @websocket_api.async_response
@@ -563,6 +574,7 @@ async def ws_update_activity_type(
         vol.Required("type_id"): str,
     }
 )
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_delete_activity_type(
     hass: HomeAssistant,
@@ -616,7 +628,7 @@ async def ws_delete_activity_type(
         vol.Required("member_id"): str,
         vol.Required("name"): str,
         vol.Required("unit"): str,
-        vol.Optional("default_value", default=0): vol.Coerce(float),
+        vol.Optional("default_value", default=0): valid_float,
     }
 )
 @websocket_api.async_response
@@ -634,6 +646,10 @@ async def ws_add_growth_type(
     # Generate type_id from name (sanitize)
     type_id = name.lower().replace(" ", "_").replace("-", "_")
     type_id = "".join(c for c in type_id if c.isalnum() or c == "_")
+
+    if not type_id:
+        connection.send_error(msg["id"], "invalid_type_id", "Name must contain at least one alphanumeric character")
+        return
 
     # Find the config entry for this member
     entry = None
@@ -682,7 +698,7 @@ async def ws_add_growth_type(
         vol.Required("type_id"): str,
         vol.Required("name"): str,
         vol.Required("unit"): str,
-        vol.Optional("default_value"): vol.Coerce(float),
+        vol.Optional("default_value"): valid_float,
     }
 )
 @websocket_api.async_response
@@ -746,6 +762,7 @@ async def ws_update_growth_type(
         vol.Required("type_id"): str,
     }
 )
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_delete_growth_type(
     hass: HomeAssistant,
@@ -814,6 +831,12 @@ async def ws_add_member(
     if not member_id:
         member_id = name.lower().replace(" ", "_").replace("-", "_")
         member_id = "".join(c for c in member_id if c.isalnum() or c == "_")
+
+    if not member_id:
+        connection.send_error(
+            msg["id"], "invalid_member_id", "Member ID is empty after sanitization"
+        )
+        return
 
     # Check if member already exists
     for e in hass.config_entries.async_entries(DOMAIN):
@@ -884,6 +907,7 @@ async def ws_update_member(
         vol.Required("member_id"): str,
     }
 )
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_delete_member(
     hass: HomeAssistant,
