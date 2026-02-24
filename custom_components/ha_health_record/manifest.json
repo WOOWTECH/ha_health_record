@@ -1,10 +1,12 @@
 {
   "domain": "ha_health_record",
   "name": "Ha Health Record",
-  "codeowners": [],
+  "codeowners": ["@oaoomg"],
   "config_flow": true,
   "dependencies": ["frontend"],
-  "iot_class": "local_push",
+  "documentation": "https://github.com/oaoomg/ha_health_record",
+  "integration_type": "service",
+  "iot_class": "calculated",
   "requirements": [],
   "version": "1.4.1"
 }
