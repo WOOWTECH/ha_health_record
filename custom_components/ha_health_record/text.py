@@ -4,11 +4,11 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.text import TextEntity, TextMode
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from . import HaHealthRecordConfigEntry
 from .coordinator import HealthRecordCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,11 +16,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HaHealthRecordConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up text entities from a config entry."""
-    coordinator: HealthRecordCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     entities: list[TextEntity] = []
 
@@ -39,6 +39,7 @@ async def async_setup_entry(
 class ActivityNoteText(TextEntity):
     """Text entity for activity note input."""
 
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_mode = TextMode.TEXT
     _attr_native_max = 255
