@@ -1578,7 +1578,7 @@ class HaHealthRecordPanel extends HTMLElement {
     // Only show selected member's quick actions
     const selectedMember = this.members.find(m => m.id === this.selectedMemberId);
     if (selectedMember) {
-      const memberJson = JSON.stringify(selectedMember).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const memberJson = JSON.stringify(selectedMember).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
 
       // Get the relevant sets based on sub-tab
       const sets = this.quickAddSubTab === 'activity'
@@ -1627,7 +1627,7 @@ class HaHealthRecordPanel extends HTMLElement {
       for (const record of filteredRecords) {
         const recordId = this._generateRecordId(record);
         const isExpanded = this.expandedRecordId === recordId;
-        const recordJson = JSON.stringify(record).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const recordJson = JSON.stringify(record).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
 
         html += `
           <div class="timeline-item ${isExpanded ? 'expanded' : ''}" data-record='${recordJson}'>
@@ -1773,7 +1773,7 @@ class HaHealthRecordPanel extends HTMLElement {
         html += `<div class="empty" style="padding: 16px;">${this._t('noActivityTypes')}</div>`;
       } else {
         for (const activity of activitySets) {
-          const typeJson = JSON.stringify(activity).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          const typeJson = JSON.stringify(activity).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
           html += `
             <div class="type-card">
               <div class="type-info">
@@ -1797,7 +1797,7 @@ class HaHealthRecordPanel extends HTMLElement {
             for (const record of activityRecords) {
               const recordId = this._generateRecordId(record);
               const isExpanded = this.expandedRecordId === recordId;
-              const recordJson = JSON.stringify(record).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+              const recordJson = JSON.stringify(record).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
 
               html += `
                 <div class="record-item ${isExpanded ? 'expanded' : ''}" data-record='${recordJson}'>
@@ -1870,7 +1870,7 @@ class HaHealthRecordPanel extends HTMLElement {
         html += `<div class="empty" style="padding: 16px;">${this._t('noGrowthTypes')}</div>`;
       } else {
         for (const growth of growthSets) {
-          const typeJson = JSON.stringify(growth).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          const typeJson = JSON.stringify(growth).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
           html += `
             <div class="type-card">
               <div class="type-info">
@@ -1894,7 +1894,7 @@ class HaHealthRecordPanel extends HTMLElement {
             for (const record of growthRecords) {
               const recordId = this._generateRecordId(record);
               const isExpanded = this.expandedRecordId === recordId;
-              const recordJson = JSON.stringify(record).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+              const recordJson = JSON.stringify(record).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
 
               html += `
                 <div class="record-item ${isExpanded ? 'expanded' : ''}" data-record='${recordJson}'>
@@ -1955,7 +1955,7 @@ class HaHealthRecordPanel extends HTMLElement {
       html += `<div class="empty">${this._t('noMembersYet')}</div>`;
     } else {
       for (const member of this.members) {
-        const memberJson = JSON.stringify(member).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const memberJson = JSON.stringify(member).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
         html += `
           <div class="type-card">
             <div class="type-info">
