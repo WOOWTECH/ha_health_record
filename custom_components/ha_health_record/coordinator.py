@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -30,6 +31,9 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+SAVE_DELAY = 1  # seconds – batches rapid operations into a single write
+MAX_RECORDS = 10_000  # per record list – oldest records are pruned beyond this limit
 
 
 def signal_activity_updated(member_id: str, activity_type: str) -> str:
@@ -172,7 +176,10 @@ class HealthRecordCoordinator:
 
         # Storage - unique per member
         self._store: Store[dict[str, Any]] = Store(
-            hass, STORAGE_VERSION, f"{STORAGE_KEY}_{self.member_id}"
+            hass,
+            STORAGE_VERSION,
+            f"{STORAGE_KEY}_{self.member_id}",
+            atomic_writes=True,
         )
 
         # Activity sets
@@ -227,9 +234,15 @@ class HealthRecordCoordinator:
             len(self.growth_records),
         )
 
-    async def _async_save(self) -> None:
-        """Save data to storage."""
-        data = {
+    @callback
+    def _async_schedule_save(self) -> None:
+        """Schedule a delayed save to storage."""
+        self._store.async_delay_save(self._data_to_save, SAVE_DELAY)
+
+    @callback
+    def _data_to_save(self) -> dict[str, Any]:
+        """Return data to save to storage."""
+        return {
             "activity_sets": {
                 type_id: activity_set.to_dict()
                 for type_id, activity_set in self.activity_sets.items()
@@ -241,8 +254,19 @@ class HealthRecordCoordinator:
             "activity_records": self.activity_records,
             "growth_records": self.growth_records,
         }
-        await self._store.async_save(data)
-        _LOGGER.debug("Saved health record data for member %s", self.member_id)
+
+    def _prune_records(self, records: list[dict[str, Any]], label: str) -> None:
+        """Remove oldest records if the list exceeds MAX_RECORDS."""
+        overflow = len(records) - MAX_RECORDS
+        if overflow > 0:
+            del records[:overflow]
+            _LOGGER.warning(
+                "Pruned %d oldest %s record(s) for member %s (limit %d)",
+                overflow,
+                label,
+                self.member_id,
+                MAX_RECORDS,
+            )
 
     def get_device_info(self) -> DeviceInfo:
         """Return device info for this member."""
@@ -263,33 +287,9 @@ class HealthRecordCoordinator:
         if activity_type in self.activity_sets:
             self.activity_sets[activity_type].current_note = note
 
-    async def async_log_activity(self, activity_type: str) -> ActivityRecord | None:
-        """Log an activity and return the record."""
-        if activity_type not in self.activity_sets:
-            return None
-
-        activity_set = self.activity_sets[activity_type]
-        record = ActivityRecord(
-            amount=activity_set.current_amount,
-            note=activity_set.current_note,
-            timestamp=dt_util.now(),
-        )
-        activity_set.last_record = record
-
-        # Save to storage
-        await self._async_save()
-
-        # Notify sensor to update
-        async_dispatcher_send(
-            self.hass,
-            signal_activity_updated(self.member_id, activity_type),
-        )
-
-        return record
-
     @callback
     def log_activity(self, activity_type: str, timestamp: datetime | None = None) -> ActivityRecord | None:
-        """Log an activity and return the record (sync wrapper)."""
+        """Log an activity and return the record."""
         if activity_type not in self.activity_sets:
             return None
 
@@ -304,6 +304,7 @@ class HealthRecordCoordinator:
 
         # Add to records history
         self.activity_records.append({
+            "id": uuid.uuid4().hex,
             "activity_type": activity_type,
             "activity_name": activity_set.name,
             "amount": activity_set.current_amount,
@@ -311,9 +312,10 @@ class HealthRecordCoordinator:
             "note": activity_set.current_note,
             "timestamp": record_timestamp.isoformat(),
         })
+        self._prune_records(self.activity_records, "activity")
 
         # Schedule save
-        self.hass.async_create_task(self._async_save())
+        self._async_schedule_save()
 
         # Notify sensor to update
         async_dispatcher_send(
@@ -323,35 +325,9 @@ class HealthRecordCoordinator:
 
         return record
 
-    async def async_set_growth_value(
-        self, growth_type: str, value: float | None
-    ) -> GrowthRecord | None:
-        """Set the value for a growth measurement and return the record."""
-        if growth_type not in self.growth_sets:
-            return None
-
-        growth_set = self.growth_sets[growth_type]
-        growth_set.current_value = value
-        record = GrowthRecord(
-            value=value,
-            timestamp=dt_util.now(),
-        )
-        growth_set.last_record = record
-
-        # Save to storage
-        await self._async_save()
-
-        # Notify sensor to update
-        async_dispatcher_send(
-            self.hass,
-            signal_growth_updated(self.member_id, growth_type),
-        )
-
-        return record
-
     @callback
     def set_growth_value(self, growth_type: str, value: float | None, note: str = "", timestamp: datetime | None = None) -> GrowthRecord | None:
-        """Set the value for a growth measurement and return the record (sync wrapper)."""
+        """Set the value for a growth measurement and return the record."""
         if growth_type not in self.growth_sets:
             return None
 
@@ -368,6 +344,7 @@ class HealthRecordCoordinator:
 
         # Add to records history
         self.growth_records.append({
+            "id": uuid.uuid4().hex,
             "growth_type": growth_type,
             "growth_name": growth_set.name,
             "value": value,
@@ -375,9 +352,10 @@ class HealthRecordCoordinator:
             "note": note,
             "timestamp": record_timestamp.isoformat(),
         })
+        self._prune_records(self.growth_records, "growth")
 
         # Schedule save
-        self.hass.async_create_task(self._async_save())
+        self._async_schedule_save()
 
         # Notify sensor to update
         async_dispatcher_send(
@@ -404,7 +382,7 @@ class HealthRecordCoordinator:
             try:
                 record_time = dt_util.parse_datetime(record["timestamp"])
                 if record_time and start_time <= record_time <= end_time:
-                    records.append({
+                    entry = {
                         "member_id": self.member_id,
                         "member_name": self.member_name,
                         "type": "activity",
@@ -414,7 +392,10 @@ class HealthRecordCoordinator:
                         "unit": record["unit"],
                         "note": record.get("note", ""),
                         "timestamp": record["timestamp"],
-                    })
+                    }
+                    if "id" in record:
+                        entry["id"] = record["id"]
+                    records.append(entry)
             except (ValueError, TypeError):
                 continue
 
@@ -423,7 +404,7 @@ class HealthRecordCoordinator:
             try:
                 record_time = dt_util.parse_datetime(record["timestamp"])
                 if record_time and start_time <= record_time <= end_time:
-                    records.append({
+                    entry = {
                         "member_id": self.member_id,
                         "member_name": self.member_name,
                         "type": "growth",
@@ -433,50 +414,81 @@ class HealthRecordCoordinator:
                         "unit": record["unit"],
                         "note": record.get("note", ""),
                         "timestamp": record["timestamp"],
-                    })
+                    }
+                    if "id" in record:
+                        entry["id"] = record["id"]
+                    records.append(entry)
             except (ValueError, TypeError):
                 continue
 
         return records
 
-    def delete_record(self, record_type: str, type_id: str, timestamp: str) -> bool:
-        """Delete a record by type and timestamp."""
-        if record_type == "activity":
-            for i, record in enumerate(self.activity_records):
-                if record["activity_type"] == type_id and record["timestamp"] == timestamp:
-                    del self.activity_records[i]
-                    self.hass.async_create_task(self._async_save())
-                    return True
-        elif record_type == "growth":
-            for i, record in enumerate(self.growth_records):
-                if record["growth_type"] == type_id and record["timestamp"] == timestamp:
-                    del self.growth_records[i]
-                    self.hass.async_create_task(self._async_save())
-                    return True
+    def delete_record(
+        self,
+        record_type: str,
+        type_id: str,
+        timestamp: str,
+        record_id: str | None = None,
+    ) -> bool:
+        """Delete a record by UUID or type+timestamp fallback."""
+        records = (
+            self.activity_records if record_type == "activity"
+            else self.growth_records if record_type == "growth"
+            else None
+        )
+        if records is None:
+            return False
+
+        type_key = "activity_type" if record_type == "activity" else "growth_type"
+        for i, record in enumerate(records):
+            # Match by UUID first (new records), fall back to timestamp (legacy)
+            if record_id and record.get("id") == record_id:
+                del records[i]
+                self._async_schedule_save()
+                return True
+            if not record_id and record[type_key] == type_id and record["timestamp"] == timestamp:
+                del records[i]
+                self._async_schedule_save()
+                return True
         return False
 
-    def update_record(self, record_type: str, type_id: str, timestamp: str, amount: float | None = None, note: str | None = None, new_timestamp: str | None = None) -> bool:
-        """Update a record by type and timestamp."""
-        if record_type == "activity":
-            for record in self.activity_records:
-                if record["activity_type"] == type_id and record["timestamp"] == timestamp:
-                    if amount is not None:
-                        record["amount"] = amount
-                    if note is not None:
-                        record["note"] = note
-                    if new_timestamp is not None:
-                        record["timestamp"] = new_timestamp
-                    self.hass.async_create_task(self._async_save())
-                    return True
-        elif record_type == "growth":
-            for record in self.growth_records:
-                if record["growth_type"] == type_id and record["timestamp"] == timestamp:
-                    if amount is not None:
-                        record["value"] = amount
-                    if note is not None:
-                        record["note"] = note
-                    if new_timestamp is not None:
-                        record["timestamp"] = new_timestamp
-                    self.hass.async_create_task(self._async_save())
-                    return True
+    def update_record(
+        self,
+        record_type: str,
+        type_id: str,
+        timestamp: str,
+        amount: float | None = None,
+        note: str | None = None,
+        new_timestamp: str | None = None,
+        record_id: str | None = None,
+    ) -> bool:
+        """Update a record by UUID or type+timestamp fallback."""
+        records = (
+            self.activity_records if record_type == "activity"
+            else self.growth_records if record_type == "growth"
+            else None
+        )
+        if records is None:
+            return False
+
+        type_key = "activity_type" if record_type == "activity" else "growth_type"
+        value_key = "amount" if record_type == "activity" else "value"
+
+        for record in records:
+            # Match by UUID first (new records), fall back to timestamp (legacy)
+            matched = False
+            if record_id and record.get("id") == record_id:
+                matched = True
+            elif not record_id and record[type_key] == type_id and record["timestamp"] == timestamp:
+                matched = True
+
+            if matched:
+                if amount is not None:
+                    record[value_key] = amount
+                if note is not None:
+                    record["note"] = note
+                if new_timestamp is not None:
+                    record["timestamp"] = new_timestamp
+                self._async_schedule_save()
+                return True
         return False

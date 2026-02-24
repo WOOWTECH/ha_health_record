@@ -1,4 +1,5 @@
 {
+  "title": "Ha Health Record",
   "entity": {
     "button": {
       "activity_log": {
@@ -39,7 +40,8 @@
       }
     },
     "error": {
-      "already_configured": "This member is already configured."
+      "already_configured": "This member is already configured.",
+      "invalid_id": "ID must contain at least one alphanumeric character."
     },
     "abort": {
       "already_configured": "This member is already configured."

@@ -4,11 +4,11 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberMode
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from . import HaHealthRecordConfigEntry
 from .coordinator import HealthRecordCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,11 +16,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HaHealthRecordConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up number entities from a config entry."""
-    coordinator: HealthRecordCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     entities: list[NumberEntity] = []
 
@@ -48,6 +48,7 @@ async def async_setup_entry(
 class ActivityAmountNumber(NumberEntity):
     """Number entity for activity amount input."""
 
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_mode = NumberMode.BOX
     _attr_native_min_value = 0
@@ -86,6 +87,7 @@ class ActivityAmountNumber(NumberEntity):
 class GrowthValueNumber(NumberEntity):
     """Number entity for growth value input."""
 
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_mode = NumberMode.BOX
     _attr_native_min_value = 0

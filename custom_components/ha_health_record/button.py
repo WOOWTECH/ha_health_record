@@ -4,11 +4,12 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, EVENT_ACTIVITY_LOGGED
+from . import HaHealthRecordConfigEntry
+from .const import EVENT_ACTIVITY_LOGGED
 from .coordinator import HealthRecordCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,11 +17,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HaHealthRecordConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up button entities from a config entry."""
-    coordinator: HealthRecordCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     entities: list[ButtonEntity] = []
 
@@ -39,6 +40,7 @@ async def async_setup_entry(
 class ActivityLogButton(ButtonEntity):
     """Button to log an activity record."""
 
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_translation_key = "activity_log"
 
@@ -89,6 +91,3 @@ class ActivityLogButton(ButtonEntity):
             activity_set.unit,
             record.note,
         )
-
-        # Trigger sensor update
-        self.async_write_ha_state()

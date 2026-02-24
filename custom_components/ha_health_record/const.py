@@ -28,14 +28,14 @@ EVENT_ACTIVITY_LOGGED = f"{DOMAIN}_activity_logged"
 
 # Default activity types
 DEFAULT_ACTIVITY_TYPES = [
-    {"id": "feeding", "name": "餵奶", "unit": "ml"},
-    {"id": "sleep", "name": "睡眠", "unit": "分鐘"},
+    {"id": "feeding", "name": "Feeding", "unit": "ml"},
+    {"id": "sleep", "name": "Sleep", "unit": "min"},
 ]
 
 # Default growth types
 DEFAULT_GROWTH_TYPES = [
-    {"id": "weight", "name": "體重", "unit": "kg"},
-    {"id": "height", "name": "身高", "unit": "cm"},
+    {"id": "weight", "name": "Weight", "unit": "kg"},
+    {"id": "height", "name": "Height", "unit": "cm"},
 ]
 
 # Custom type identifier
