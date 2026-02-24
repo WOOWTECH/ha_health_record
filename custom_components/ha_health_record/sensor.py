@@ -5,12 +5,11 @@ import logging
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from . import HaHealthRecordConfigEntry
 from .coordinator import (
     HealthRecordCoordinator,
     signal_activity_updated,
@@ -22,11 +21,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: HaHealthRecordConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensor entities from a config entry."""
-    coordinator: HealthRecordCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     entities: list[SensorEntity] = []
 
@@ -55,7 +54,7 @@ class ActivityRecordSensor(SensorEntity):
     """Sensor showing the last activity record."""
 
     _attr_has_entity_name = True
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_should_poll = False
     _attr_translation_key = "activity_record"
 
     def __init__(
@@ -122,6 +121,7 @@ class GrowthRecordSensor(SensorEntity):
     """Sensor showing the current growth value."""
 
     _attr_has_entity_name = True
+    _attr_should_poll = False
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_translation_key = "growth_record"
 
