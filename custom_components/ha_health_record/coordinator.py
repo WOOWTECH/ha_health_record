@@ -31,6 +31,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+SAVE_DELAY = 1  # seconds – batches rapid operations into a single write
+
 
 def signal_activity_updated(member_id: str, activity_type: str) -> str:
     """Return signal name for activity update."""
@@ -227,9 +229,15 @@ class HealthRecordCoordinator:
             len(self.growth_records),
         )
 
-    async def _async_save(self) -> None:
-        """Save data to storage."""
-        data = {
+    @callback
+    def _async_schedule_save(self) -> None:
+        """Schedule a delayed save to storage."""
+        self._store.async_delay_save(self._data_to_save, SAVE_DELAY)
+
+    @callback
+    def _data_to_save(self) -> dict[str, Any]:
+        """Return data to save to storage."""
+        return {
             "activity_sets": {
                 type_id: activity_set.to_dict()
                 for type_id, activity_set in self.activity_sets.items()
@@ -241,8 +249,6 @@ class HealthRecordCoordinator:
             "activity_records": self.activity_records,
             "growth_records": self.growth_records,
         }
-        await self._store.async_save(data)
-        _LOGGER.debug("Saved health record data for member %s", self.member_id)
 
     def get_device_info(self) -> DeviceInfo:
         """Return device info for this member."""
@@ -265,7 +271,7 @@ class HealthRecordCoordinator:
 
     @callback
     def log_activity(self, activity_type: str, timestamp: datetime | None = None) -> ActivityRecord | None:
-        """Log an activity and return the record (sync wrapper)."""
+        """Log an activity and return the record."""
         if activity_type not in self.activity_sets:
             return None
 
@@ -289,7 +295,7 @@ class HealthRecordCoordinator:
         })
 
         # Schedule save
-        self.hass.async_create_task(self._async_save())
+        self._async_schedule_save()
 
         # Notify sensor to update
         async_dispatcher_send(
@@ -301,7 +307,7 @@ class HealthRecordCoordinator:
 
     @callback
     def set_growth_value(self, growth_type: str, value: float | None, note: str = "", timestamp: datetime | None = None) -> GrowthRecord | None:
-        """Set the value for a growth measurement and return the record (sync wrapper)."""
+        """Set the value for a growth measurement and return the record."""
         if growth_type not in self.growth_sets:
             return None
 
@@ -327,7 +333,7 @@ class HealthRecordCoordinator:
         })
 
         # Schedule save
-        self.hass.async_create_task(self._async_save())
+        self._async_schedule_save()
 
         # Notify sensor to update
         async_dispatcher_send(
@@ -395,13 +401,13 @@ class HealthRecordCoordinator:
             for i, record in enumerate(self.activity_records):
                 if record["activity_type"] == type_id and record["timestamp"] == timestamp:
                     del self.activity_records[i]
-                    self.hass.async_create_task(self._async_save())
+                    self._async_schedule_save()
                     return True
         elif record_type == "growth":
             for i, record in enumerate(self.growth_records):
                 if record["growth_type"] == type_id and record["timestamp"] == timestamp:
                     del self.growth_records[i]
-                    self.hass.async_create_task(self._async_save())
+                    self._async_schedule_save()
                     return True
         return False
 
@@ -416,7 +422,7 @@ class HealthRecordCoordinator:
                         record["note"] = note
                     if new_timestamp is not None:
                         record["timestamp"] = new_timestamp
-                    self.hass.async_create_task(self._async_save())
+                    self._async_schedule_save()
                     return True
         elif record_type == "growth":
             for record in self.growth_records:
@@ -427,6 +433,6 @@ class HealthRecordCoordinator:
                         record["note"] = note
                     if new_timestamp is not None:
                         record["timestamp"] = new_timestamp
-                    self.hass.async_create_task(self._async_save())
+                    self._async_schedule_save()
                     return True
         return False
