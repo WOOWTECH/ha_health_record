@@ -24,9 +24,9 @@ PANEL_COMPONENT_NAME = "ha-health-record-panel"  # Web component name
 FRONTEND_SCRIPT_PATH = f"/{DOMAIN}/frontend"  # Static path for JS files
 
 
-async def async_setup_panel(hass: HomeAssistant) -> None:
-    """Set up the Ha Health Record panel."""
-    # Register WebSocket commands
+@callback
+def register_websocket_commands(hass: HomeAssistant) -> None:
+    """Register all WebSocket commands (call once, not per entry)."""
     websocket_api.async_register_command(hass, ws_get_members)
     websocket_api.async_register_command(hass, ws_get_records)
     websocket_api.async_register_command(hass, ws_log_activity)
@@ -47,6 +47,9 @@ async def async_setup_panel(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_update_member)
     websocket_api.async_register_command(hass, ws_delete_member)
 
+
+async def async_setup_panel(hass: HomeAssistant) -> None:
+    """Set up the Ha Health Record panel (static paths + sidebar)."""
     # Register static path for frontend files
     frontend_path = Path(__file__).parent / "frontend"
     await hass.http.async_register_static_paths([
