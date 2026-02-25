@@ -26,10 +26,10 @@ class HaHealthRecordPanel extends HTMLElement {
     this.inputTimestamp = '';
     this.growthTimestamp = '';
 
-    // New state for PRD 2 features
-    this.activeTab = 'quickAdd'; // 'quickAdd' | 'record' | 'member'
-    this.quickAddSubTab = 'activity'; // 'activity' | 'growth' - for Quick Add tab
+    // Tab state
+    this.activeTab = 'record'; // 'record' | 'settings'
     this.recordSubTab = 'activity'; // 'activity' | 'growth' - for Record tab
+    this.settingsSubTab = 'members'; // 'members' | 'activityTypes' | 'growthTypes'
     this.expandedRecordId = null;
     this.editingRecord = null; // { amount, note }
     this.showTypeDialog = false;
@@ -56,14 +56,14 @@ class HaHealthRecordPanel extends HTMLElement {
         allMembers: 'All Members',
         selectMember: 'Select Member',
         // Tabs
-        quickAdd: 'Quick Add',
         record: 'Record',
-        member: 'Member',
+        settings: 'Settings',
         // Sub-tabs
         activityTypes: 'Activity Types',
         growthTypes: 'Growth Types',
+        members: 'Members',
         // Timeline
-        noMembers: 'No members configured. Go to the Member tab to add members.',
+        noMembers: 'No members configured. Go to the Settings tab to add members.',
         noRecords: 'No records for this date range.',
         // Manage
         noMembersManage: 'No members configured. Add a member first.',
@@ -123,14 +123,14 @@ class HaHealthRecordPanel extends HTMLElement {
         allMembers: '所有成員',
         selectMember: '選擇成員',
         // Tabs
-        quickAdd: '快速新增',
         record: '紀錄',
-        member: '成員',
+        settings: '設定',
         // Sub-tabs
         activityTypes: '活動類型',
         growthTypes: '生長類型',
+        members: '成員',
         // Timeline
-        noMembers: '尚未設定成員。請前往「成員」分頁新增成員。',
+        noMembers: '尚未設定成員。請前往「設定」分頁新增成員。',
         noRecords: '此日期範圍內沒有紀錄。',
         // Manage
         noMembersManage: '尚未設定成員。請先新增成員。',
@@ -190,14 +190,14 @@ class HaHealthRecordPanel extends HTMLElement {
         allMembers: '所有成员',
         selectMember: '选择成员',
         // Tabs
-        quickAdd: '快速添加',
         record: '记录',
-        member: '成员',
+        settings: '设置',
         // Sub-tabs
         activityTypes: '活动类型',
         growthTypes: '生长类型',
+        members: '成员',
         // Timeline
-        noMembers: '尚未设置成员。请前往"成员"标签页添加成员。',
+        noMembers: '尚未设置成员。请前往"设置"标签页添加成员。',
         noRecords: '此日期范围内没有记录。',
         // Manage
         noMembersManage: '尚未设置成员。请先添加成员。',
@@ -518,13 +518,13 @@ class HaHealthRecordPanel extends HTMLElement {
     this._render();
   }
 
-  _switchQuickAddSubTab(subTab) {
-    this.quickAddSubTab = subTab;
+  _switchRecordSubTab(subTab) {
+    this.recordSubTab = subTab;
     this._render();
   }
 
-  _switchRecordSubTab(subTab) {
-    this.recordSubTab = subTab;
+  _switchSettingsSubTab(subTab) {
+    this.settingsSubTab = subTab;
     this._render();
   }
 
@@ -689,6 +689,7 @@ class HaHealthRecordPanel extends HTMLElement {
     // Save current URL and tab state before reload
     const currentTab = this.activeTab;
     const currentSubTab = this.recordSubTab;
+    const currentSettingsSubTab = this.settingsSubTab;
     const panelUrl = '/ha-health-record';
 
     // Wait a bit then try to reload data, with retries
@@ -713,6 +714,7 @@ class HaHealthRecordPanel extends HTMLElement {
         // Restore tab state
         this.activeTab = currentTab;
         this.recordSubTab = currentSubTab;
+        this.settingsSubTab = currentSettingsSubTab;
         this._render();
         return; // Success
       } catch (error) {
@@ -1500,18 +1502,15 @@ class HaHealthRecordPanel extends HTMLElement {
       // Tab Navigation
       content += `
         <div class="tabs">
-          <button class="tab ${this.activeTab === 'quickAdd' ? 'active' : ''}" data-tab="quickAdd">${this._t('quickAdd')}</button>
           <button class="tab ${this.activeTab === 'record' ? 'active' : ''}" data-tab="record">${this._t('record')}</button>
-          <button class="tab ${this.activeTab === 'member' ? 'active' : ''}" data-tab="member">${this._t('member')}</button>
+          <button class="tab ${this.activeTab === 'settings' ? 'active' : ''}" data-tab="settings">${this._t('settings')}</button>
         </div>
       `;
 
-      if (this.activeTab === 'quickAdd') {
-        content += this._renderQuickAddTab();
-      } else if (this.activeTab === 'record') {
+      if (this.activeTab === 'record') {
         content += this._renderRecordTab();
       } else {
-        content += this._renderMemberTab();
+        content += this._renderSettingsTab();
       }
     }
 
@@ -1524,10 +1523,10 @@ class HaHealthRecordPanel extends HTMLElement {
     this._attachEventListeners();
   }
 
-  _renderQuickAddTab() {
+  _renderRecordTab() {
     let html = '';
 
-    // Search Row (separate row)
+    // Search Row
     html += `
       <div class="search-row">
         <div class="search-row-input-wrapper">
@@ -1543,7 +1542,7 @@ class HaHealthRecordPanel extends HTMLElement {
       </div>
     `;
 
-    // Time Filter Row (separate row)
+    // Time Filter Row
     html += `
       <div class="time-filter-row">
         <input type="datetime-local" id="start-date" value="${this.startDate}">
@@ -1553,7 +1552,7 @@ class HaHealthRecordPanel extends HTMLElement {
       </div>
     `;
 
-    // Member Selection Card (like Finance Record account selector)
+    // Member Selection Card
     html += `
       <div class="member-selection-card">
         <div class="card-title">${this._t('selectMember')}</div>
@@ -1570,18 +1569,17 @@ class HaHealthRecordPanel extends HTMLElement {
     // Sub-tabs for Activity/Growth
     html += `
       <div class="sub-tabs">
-        <button class="sub-tab ${this.quickAddSubTab === 'activity' ? 'active' : ''}" data-quickadd-subtab="activity">${this._t('activities')}</button>
-        <button class="sub-tab ${this.quickAddSubTab === 'growth' ? 'active' : ''}" data-quickadd-subtab="growth">${this._t('growth')}</button>
+        <button class="sub-tab ${this.recordSubTab === 'activity' ? 'active' : ''}" data-subtab="activity">${this._t('activities')}</button>
+        <button class="sub-tab ${this.recordSubTab === 'growth' ? 'active' : ''}" data-subtab="growth">${this._t('growth')}</button>
       </div>
     `;
 
-    // Only show selected member's quick actions
+    // Quick action buttons for selected member
     const selectedMember = this.members.find(m => m.id === this.selectedMemberId);
     if (selectedMember) {
       const memberJson = JSON.stringify(selectedMember).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
 
-      // Get the relevant sets based on sub-tab
-      const sets = this.quickAddSubTab === 'activity'
+      const sets = this.recordSubTab === 'activity'
         ? (selectedMember.activity_sets || [])
         : (selectedMember.growth_sets || []);
 
@@ -1592,7 +1590,7 @@ class HaHealthRecordPanel extends HTMLElement {
             <div class="quick-actions">
         `;
 
-        if (this.quickAddSubTab === 'activity') {
+        if (this.recordSubTab === 'activity') {
           for (const activity of sets) {
             html += `
               <button class="quick-action-btn" data-member='${memberJson}' data-type="${activity.type}">
@@ -1612,14 +1610,14 @@ class HaHealthRecordPanel extends HTMLElement {
 
         html += '</div></div>';
       } else {
-        html += `<div class="empty">${this.quickAddSubTab === 'activity' ? this._t('noActivityTypes') : this._t('noGrowthTypes')}</div>`;
+        html += `<div class="empty">${this.recordSubTab === 'activity' ? this._t('noActivityTypes') : this._t('noGrowthTypes')}</div>`;
       }
     } else if (this.members.length === 0) {
       html += `<div class="empty">${this._t('noMembers')}</div>`;
     }
 
-    // Records timeline section - filter by selected sub-tab and member
-    const filteredRecords = this._getFilteredRecords(this.quickAddSubTab);
+    // Records timeline section
+    const filteredRecords = this._getFilteredRecords(this.recordSubTab);
     html += `<div class="timeline-section"><h2>${this._t('record')}</h2>`;
     if (filteredRecords.length === 0) {
       html += `<div class="empty">${this._t('noRecords')}</div>`;
@@ -1684,72 +1682,54 @@ class HaHealthRecordPanel extends HTMLElement {
     return html;
   }
 
-  _renderRecordTab() {
+  _renderSettingsTab() {
     let html = '';
 
-    // Search Row
-    html += `
-      <div class="search-row">
-        <div class="search-row-input-wrapper">
-          <svg class="search-row-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/></svg>
-          <input
-            class="search-row-input"
-            type="text"
-            id="search-input"
-            placeholder="${this._t('search')}"
-            value="${this._escapeHtml(this.searchQuery)}"
-          />
-        </div>
-      </div>
-    `;
-
-    // Time Filter Row
-    html += `
-      <div class="time-filter-row">
-        <input type="datetime-local" id="start-date" value="${this.startDate}">
-        <span>${this._t('to')}</span>
-        <input type="datetime-local" id="end-date" value="${this.endDate}">
-        <button class="filter-btn" id="filter-btn">${this._t('filter')}</button>
-      </div>
-    `;
-
-    // Member Selection Card
-    html += `
-      <div class="member-selection-card">
-        <div class="card-title">${this._t('selectMember')}</div>
-        <select id="member-selector">
-          ${this.members.map(m => `
-            <option value="${m.id}" ${m.id === this.selectedMemberId ? 'selected' : ''}>
-              ${this._escapeHtml(m.name)}
-            </option>
-          `).join('')}
-        </select>
-      </div>
-    `;
-
-    // Sub-tabs
+    // Settings sub-tabs: Members | Activity Types | Growth Types
     html += `
       <div class="sub-tabs">
-        <button class="sub-tab ${this.recordSubTab === 'activity' ? 'active' : ''}" data-subtab="activity">${this._t('activityTypes')}</button>
-        <button class="sub-tab ${this.recordSubTab === 'growth' ? 'active' : ''}" data-subtab="growth">${this._t('growthTypes')}</button>
+        <button class="sub-tab ${this.settingsSubTab === 'members' ? 'active' : ''}" data-settings-subtab="members">${this._t('members')}</button>
+        <button class="sub-tab ${this.settingsSubTab === 'activityTypes' ? 'active' : ''}" data-settings-subtab="activityTypes">${this._t('activityTypes')}</button>
+        <button class="sub-tab ${this.settingsSubTab === 'growthTypes' ? 'active' : ''}" data-settings-subtab="growthTypes">${this._t('growthTypes')}</button>
       </div>
     `;
 
     html += '<div class="manage-section">';
 
-    if (this.recordSubTab === 'activity') {
+    if (this.settingsSubTab === 'members') {
+      html += this._renderMembersManagement();
+    } else if (this.settingsSubTab === 'activityTypes') {
+      // Member selector for type management
+      html += `
+        <div class="member-selection-card">
+          <div class="card-title">${this._t('selectMember')}</div>
+          <select id="member-selector">
+            ${this.members.map(m => `
+              <option value="${m.id}" ${m.id === this.selectedMemberId ? 'selected' : ''}>
+                ${this._escapeHtml(m.name)}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+      `;
       html += this._renderActivityTypesManagement();
     } else {
+      // Growth Types sub-tab
+      html += `
+        <div class="member-selection-card">
+          <div class="card-title">${this._t('selectMember')}</div>
+          <select id="member-selector">
+            ${this.members.map(m => `
+              <option value="${m.id}" ${m.id === this.selectedMemberId ? 'selected' : ''}>
+                ${this._escapeHtml(m.name)}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+      `;
       html += this._renderGrowthTypesManagement();
     }
 
-    html += '</div>';
-    return html;
-  }
-
-  _renderMemberTab() {
-    let html = '<div class="manage-section">';
-    html += this._renderMembersManagement();
     html += '</div>';
     return html;
   }
@@ -2164,14 +2144,14 @@ class HaHealthRecordPanel extends HTMLElement {
       tab.addEventListener('click', () => this._switchTab(tab.dataset.tab));
     });
 
-    // Quick Add sub-tab navigation
-    this.shadowRoot.querySelectorAll('.sub-tab[data-quickadd-subtab]').forEach(tab => {
-      tab.addEventListener('click', () => this._switchQuickAddSubTab(tab.dataset.quickaddSubtab));
-    });
-
     // Record sub-tab navigation
     this.shadowRoot.querySelectorAll('.sub-tab[data-subtab]').forEach(tab => {
       tab.addEventListener('click', () => this._switchRecordSubTab(tab.dataset.subtab));
+    });
+
+    // Settings sub-tab navigation
+    this.shadowRoot.querySelectorAll('.sub-tab[data-settings-subtab]').forEach(tab => {
+      tab.addEventListener('click', () => this._switchSettingsSubTab(tab.dataset.settingsSubtab));
     });
 
     // Filter button
