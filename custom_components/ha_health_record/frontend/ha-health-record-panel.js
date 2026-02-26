@@ -1101,6 +1101,35 @@ class HaHealthRecordPanel extends HTMLElement {
         font-size: 12px;
         color: var(--secondary-text-color);
       }
+      .member-chip-add {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        background: transparent;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px dashed var(--divider-color, #ccc);
+        min-width: 120px;
+        justify-content: center;
+      }
+      .member-chip-add:hover {
+        border-color: var(--primary-color);
+        background: var(--secondary-background-color, #f5f5f5);
+      }
+      .member-chip-add-icon {
+        font-size: 20px;
+        color: var(--secondary-text-color, #757575);
+      }
+      .member-chip-add-label {
+        font-size: 14px;
+        color: var(--secondary-text-color, #757575);
+      }
+      .member-chip-add:hover .member-chip-add-icon,
+      .member-chip-add:hover .member-chip-add-label {
+        color: var(--primary-color);
+      }
 
       /* MEMBER OVERVIEW CARD */
       .overview-card {
@@ -1656,6 +1685,12 @@ class HaHealthRecordPanel extends HTMLElement {
         </div>
       `;
     }
+    html += `
+      <div class="member-chip-add" id="add-member-chip">
+        <span class="member-chip-add-icon">+</span>
+        <span class="member-chip-add-label">${this._t('addMember')}</span>
+      </div>
+    `;
     html += '</div>';
     return html;
   }
@@ -2073,31 +2108,29 @@ class HaHealthRecordPanel extends HTMLElement {
 
   _renderMembersManagement() {
     let html = '';
+    const member = this.members.find(m => m.id === this.selectedMemberId);
 
-    if (this.members.length === 0) {
+    if (!member) {
       html += `<div class="empty">${this._t('noMembersYet')}</div>`;
     } else {
-      for (const member of this.members) {
-        const memberJson = JSON.stringify(member).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-        html += `
-          <div class="type-card">
-            <div class="type-info">
-              <div class="type-name">${this._escapeHtml(member.name)}</div>
-              <div class="type-details">
-                ID: ${this._escapeHtml(member.id)} | ${this._t('activities')}: ${(member.activity_sets || []).length} | ${this._t('growth')}: ${(member.growth_sets || []).length}
-                ${member.note ? `<br>${this._t('note')}: ${this._escapeHtml(member.note)}` : ''}
-              </div>
-            </div>
-            <div class="type-actions">
-              <button class="btn-icon edit-member-btn" data-member='${memberJson}'>✏️</button>
-              <button class="btn-icon danger delete-member-btn" data-member='${memberJson}'>🗑</button>
+      const memberJson = JSON.stringify(member).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+      html += `
+        <div class="type-card">
+          <div class="type-info">
+            <div class="type-name">${this._escapeHtml(member.name)}</div>
+            <div class="type-details">
+              ID: ${this._escapeHtml(member.id)} | ${this._t('activities')}: ${(member.activity_sets || []).length} | ${this._t('growth')}: ${(member.growth_sets || []).length}
+              ${member.note ? `<br>${this._t('note')}: ${this._escapeHtml(member.note)}` : ''}
             </div>
           </div>
-        `;
-      }
+          <div class="type-actions">
+            <button class="btn-icon edit-member-btn" data-member='${memberJson}'>✏️</button>
+            <button class="btn-icon danger delete-member-btn" data-member='${memberJson}'>🗑</button>
+          </div>
+        </div>
+      `;
     }
 
-    html += `<button class="add-button add-member-btn">${this._t('addMember')}</button>`;
     return html;
   }
 
@@ -2320,6 +2353,12 @@ class HaHealthRecordPanel extends HTMLElement {
       });
     });
 
+    // Add Member chip in member switcher
+    const addMemberChip = this.shadowRoot.querySelector('#add-member-chip');
+    if (addMemberChip) {
+      addMemberChip.addEventListener('click', () => this._openAddMemberDialog());
+    }
+
     // Quick action buttons (activity)
     this.shadowRoot.querySelectorAll('.quick-action-btn:not(.growth-btn)').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -2463,12 +2502,6 @@ class HaHealthRecordPanel extends HTMLElement {
         this._showDeleteMemberConfirm(member);
       });
     });
-
-    // Member management - Add button
-    const addMemberBtn = this.shadowRoot.querySelector('.add-member-btn');
-    if (addMemberBtn) {
-      addMemberBtn.addEventListener('click', () => this._openAddMemberDialog());
-    }
 
     // Input Dialog buttons
     const cancelInputBtn = this.shadowRoot.querySelector('#cancel-input-btn');
