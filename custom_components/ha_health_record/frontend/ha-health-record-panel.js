@@ -1944,63 +1944,6 @@ class HaHealthRecordPanel extends HTMLElement {
               </div>
             </div>
           `;
-
-          // Show records for this activity type
-          const activityRecords = this._getFilteredRecords('activity').filter(r =>
-            r.member_id === selectedMember.id &&
-            r.activity_type === activity.type
-          );
-          if (activityRecords.length > 0) {
-            html += '<div class="type-records">';
-            for (const record of activityRecords) {
-              const recordId = this._generateRecordId(record);
-              const isExpanded = this.expandedRecordId === recordId;
-              const recordJson = JSON.stringify(record).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-
-              html += `
-                <div class="record-item ${isExpanded ? 'expanded' : ''}" data-record='${recordJson}'>
-                  <div class="record-row">
-                    <div class="record-time">${this._formatDate(record.timestamp)} ${this._formatTime(record.timestamp)}</div>
-                    <div class="record-value">${record.amount != null ? record.amount : ''} ${record.unit ? this._escapeHtml(record.unit) : ''}</div>
-                    <div class="record-note">${record.note ? this._escapeHtml(record.note) : ''}</div>
-                  </div>
-              `;
-
-              if (isExpanded && this.editingRecord) {
-                html += `
-                  <div class="timeline-edit-form">
-                    <div class="edit-field">
-                      <label>${this._t('timestamp')}</label>
-                      <div class="timestamp-row">
-                        <input type="datetime-local" id="edit-timestamp" value="${this.editingRecord.timestamp}">
-                        <button class="btn btn-secondary btn-small" id="edit-now-btn">${this._t('now')}</button>
-                      </div>
-                    </div>
-                    <div class="edit-field">
-                      <label>${this._t('amount')}${record.unit ? ` (${record.unit})` : ''}</label>
-                      <input type="number" id="edit-amount" value="${this.editingRecord.amount}" step="0.1">
-                    </div>
-                    <div class="edit-field">
-                      <label>${this._t('note')}</label>
-                      <input type="text" id="edit-note" value="${this._escapeHtml(this.editingRecord.note)}" placeholder="${this._t('optionalNote')}">
-                    </div>
-                    <div class="edit-actions">
-                      <button class="btn-icon danger delete-record-btn" data-record='${recordJson}'>🗑 ${this._t('delete')}</button>
-                      <div class="edit-actions-left">
-                        <button class="btn btn-secondary cancel-edit-btn">${this._t('cancel')}</button>
-                        <button class="btn btn-primary save-edit-btn" data-record='${recordJson}' ${this.submitting ? 'disabled' : ''}>
-                          ${this.submitting ? this._t('saving') : this._t('save')}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                `;
-              }
-
-              html += '</div>';
-            }
-            html += '</div>';
-          }
         }
       }
       html += `<button class="add-button" data-category="activity">${this._t('addActivityType')}</button>`;
@@ -2041,63 +1984,6 @@ class HaHealthRecordPanel extends HTMLElement {
               </div>
             </div>
           `;
-
-          // Show records for this growth type
-          const growthRecords = this._getFilteredRecords('growth').filter(r =>
-            r.member_id === selectedMember.id &&
-            r.growth_type === growth.type
-          );
-          if (growthRecords.length > 0) {
-            html += '<div class="type-records">';
-            for (const record of growthRecords) {
-              const recordId = this._generateRecordId(record);
-              const isExpanded = this.expandedRecordId === recordId;
-              const recordJson = JSON.stringify(record).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-
-              html += `
-                <div class="record-item ${isExpanded ? 'expanded' : ''}" data-record='${recordJson}'>
-                  <div class="record-row">
-                    <div class="record-time">${this._formatDate(record.timestamp)} ${this._formatTime(record.timestamp)}</div>
-                    <div class="record-value">${record.value != null ? record.value : ''} ${record.unit ? this._escapeHtml(record.unit) : ''}</div>
-                    <div class="record-note">${record.note ? this._escapeHtml(record.note) : ''}</div>
-                  </div>
-              `;
-
-              if (isExpanded && this.editingRecord) {
-                html += `
-                  <div class="timeline-edit-form">
-                    <div class="edit-field">
-                      <label>${this._t('timestamp')}</label>
-                      <div class="timestamp-row">
-                        <input type="datetime-local" id="edit-timestamp" value="${this.editingRecord.timestamp}">
-                        <button class="btn btn-secondary btn-small" id="edit-now-btn">${this._t('now')}</button>
-                      </div>
-                    </div>
-                    <div class="edit-field">
-                      <label>${this._t('value')}${record.unit ? ` (${record.unit})` : ''}</label>
-                      <input type="number" id="edit-amount" value="${this.editingRecord.amount}" step="0.1">
-                    </div>
-                    <div class="edit-field">
-                      <label>${this._t('note')}</label>
-                      <input type="text" id="edit-note" value="${this._escapeHtml(this.editingRecord.note)}" placeholder="${this._t('optionalNote')}">
-                    </div>
-                    <div class="edit-actions">
-                      <button class="btn-icon danger delete-record-btn" data-record='${recordJson}'>🗑 ${this._t('delete')}</button>
-                      <div class="edit-actions-left">
-                        <button class="btn btn-secondary cancel-edit-btn">${this._t('cancel')}</button>
-                        <button class="btn btn-primary save-edit-btn" data-record='${recordJson}' ${this.submitting ? 'disabled' : ''}>
-                          ${this.submitting ? this._t('saving') : this._t('save')}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                `;
-              }
-
-              html += '</div>';
-            }
-            html += '</div>';
-          }
         }
       }
       html += `<button class="add-button" data-category="growth">${this._t('addGrowthType')}</button>`;
