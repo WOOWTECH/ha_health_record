@@ -350,7 +350,7 @@ class HaHealthRecordPanel extends HTMLElement {
     this.selectedMember = member;
     this.selectedType = recordType;
     const typeInfo = (member.record_sets || []).find(s => s.type === recordType);
-    this.inputValue = typeInfo?.current_value || 0;
+    this.inputValue = typeInfo?.default_value ?? 0;
     this.inputNote = '';
     this.inputTimestamp = this._toLocalISOString(new Date());
     this.showInputDialog = true;
@@ -1784,7 +1784,7 @@ class HaHealthRecordPanel extends HTMLElement {
             <div class="type-card">
               <div class="type-info">
                 <div class="type-name">${this._escapeHtml(recordSet.name)}</div>
-                <div class="type-details">${this._t('unit')}: ${this._escapeHtml(recordSet.unit)} | ${this._t('current')}: ${recordSet.current_value || 0}</div>
+                <div class="type-details">${this._t('unit')}: ${this._escapeHtml(recordSet.unit)} | ${this._t('defaultValue')}: ${recordSet.default_value ?? 0}</div>
               </div>
               <div class="type-actions">
                 <button class="btn-icon edit-type-btn" data-member="${selectedMember.id}" data-type='${typeJson}'>✏️</button>
