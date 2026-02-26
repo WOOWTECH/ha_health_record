@@ -548,7 +548,7 @@ class HaHealthRecordPanel extends HTMLElement {
       data: {
         name: typeData.name,
         unit: typeData.unit,
-        default_value: typeData.current_value || 0,
+        default_value: typeData.default_value ?? 0,
       },
     };
     this.showTypeDialog = true;

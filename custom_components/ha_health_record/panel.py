@@ -132,11 +132,13 @@ def ws_get_members(
         member = {
             "id": coordinator.member_id,
             "name": coordinator.member_name,
+            "note": coordinator.entry.data.get("note", ""),
             "record_sets": [
                 {
                     "type": s.type_id,
                     "name": s.name,
                     "unit": s.unit,
+                    "default_value": s.default_value,
                     "current_value": s.current_value,
                     "last_record": {
                         "value": s.last_record.value,
@@ -546,6 +548,7 @@ async def ws_delete_record_type(
         vol.Required("type"): "ha_health_record/add_member",
         vol.Required("name"): str,
         vol.Optional("member_id"): str,
+        vol.Optional("note", default=""): str,
     }
 )
 @websocket_api.async_response
@@ -575,11 +578,13 @@ async def ws_add_member(
             connection.send_error(msg["id"], "member_exists", f"Member {member_id} already exists")
             return
 
+    note = msg.get("note", "")
+
     # Create new config entry via config flow
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
         context={"source": "user"},
-        data={"member_name": name, "member_id": member_id},
+        data={"member_name": name, "member_id": member_id, "note": note},
     )
 
     if result.get("type") == "create_entry":
@@ -597,6 +602,7 @@ async def ws_add_member(
         vol.Required("type"): "ha_health_record/update_member",
         vol.Required("member_id"): str,
         vol.Required("name"): str,
+        vol.Optional("note", default=""): str,
     }
 )
 @websocket_api.async_response
@@ -620,9 +626,12 @@ async def ws_update_member(
         connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
         return
 
+    note = msg.get("note", "")
+
     # Update entry data (need to update both data and title)
     new_data = dict(entry.data)
     new_data["member_name"] = name
+    new_data["note"] = note
 
     hass.config_entries.async_update_entry(entry, data=new_data, title=name)
 
