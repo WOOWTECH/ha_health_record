@@ -1,30 +1,24 @@
 {
   "title": "Ha Health Record",
   "entity": {
-    "button": {
-      "activity_log": {
-        "name": "{activity_name} Log"
+    "sensor": {
+      "record": {
+        "name": "{record_name} Record"
       }
     },
     "number": {
-      "activity_amount": {
-        "name": "{activity_name} Amount"
-      },
-      "growth_input": {
-        "name": "{growth_name} Input"
+      "record_value": {
+        "name": "{record_name} Value"
+      }
+    },
+    "button": {
+      "record_log": {
+        "name": "{record_name} Log"
       }
     },
     "text": {
-      "activity_note": {
-        "name": "{activity_name} Note"
-      }
-    },
-    "sensor": {
-      "activity_record": {
-        "name": "{activity_name} Record"
-      },
-      "growth_record": {
-        "name": "{growth_name} Record"
+      "record_note": {
+        "name": "{record_name} Note"
       }
     }
   },

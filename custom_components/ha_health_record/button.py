@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import HaHealthRecordConfigEntry
-from .const import EVENT_ACTIVITY_LOGGED
+from .const import EVENT_RECORD_LOGGED
 from .coordinator import HealthRecordCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,69 +25,68 @@ async def async_setup_entry(
 
     entities: list[ButtonEntity] = []
 
-    # Create a log button for each activity set
-    for activity_type, activity_set in coordinator.activity_sets.items():
+    for type_id in coordinator.record_sets:
         entities.append(
-            ActivityLogButton(
+            RecordLogButton(
                 coordinator=coordinator,
-                activity_type=activity_type,
+                type_id=type_id,
             )
         )
 
     async_add_entities(entities)
 
 
-class ActivityLogButton(ButtonEntity):
-    """Button to log an activity record."""
+class RecordLogButton(ButtonEntity):
+    """Button to log a record."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
-    _attr_translation_key = "activity_log"
+    _attr_translation_key = "record_log"
 
     def __init__(
         self,
         coordinator: HealthRecordCoordinator,
-        activity_type: str,
+        type_id: str,
     ) -> None:
         """Initialize the button."""
         self._coordinator = coordinator
-        self._activity_type = activity_type
-        activity_set = coordinator.get_activity_set(activity_type)
+        self._type_id = type_id
+        record_set = coordinator.get_record_set(type_id)
 
-        self._attr_unique_id = f"{coordinator.member_id}_{activity_type}_log"
-        self._attr_translation_placeholders = {"activity_name": activity_set.name}
+        self._attr_unique_id = f"{coordinator.member_id}_{type_id}_log"
+        self._attr_translation_placeholders = {"record_name": record_set.name}
         self._attr_device_info = coordinator.get_device_info()
         self._attr_icon = "mdi:content-save"
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        record = self._coordinator.log_activity(self._activity_type)
+        record = self._coordinator.log_record(self._type_id)
 
         if record is None:
-            _LOGGER.warning("Failed to log activity: %s", self._activity_type)
+            _LOGGER.warning("Failed to log record: %s", self._type_id)
             return
 
-        activity_set = self._coordinator.get_activity_set(self._activity_type)
+        record_set = self._coordinator.get_record_set(self._type_id)
 
         # Fire event
         self.hass.bus.async_fire(
-            EVENT_ACTIVITY_LOGGED,
+            EVENT_RECORD_LOGGED,
             {
                 "member_id": self._coordinator.member_id,
                 "member_name": self._coordinator.member_name,
-                "activity_type": self._activity_type,
-                "activity_name": activity_set.name,
-                "amount": record.amount,
-                "unit": activity_set.unit,
+                "record_type": self._type_id,
+                "record_name": record_set.name,
+                "value": record.value,
+                "unit": record_set.unit,
                 "note": record.note,
                 "timestamp": record.timestamp.isoformat() if record.timestamp else None,
             },
         )
 
         _LOGGER.info(
-            "Activity logged: %s - %s %s (note: %s)",
-            activity_set.name,
-            record.amount,
-            activity_set.unit,
+            "Record logged: %s - %s %s (note: %s)",
+            record_set.name,
+            record.value,
+            record_set.unit,
             record.note,
         )

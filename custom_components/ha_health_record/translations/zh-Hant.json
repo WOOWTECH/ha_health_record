@@ -1,29 +1,23 @@
 {
   "entity": {
-    "button": {
-      "activity_log": {
-        "name": "{activity_name} 紀錄"
+    "sensor": {
+      "record": {
+        "name": "{record_name} 紀錄"
       }
     },
     "number": {
-      "activity_amount": {
-        "name": "{activity_name} 數值"
-      },
-      "growth_input": {
-        "name": "{growth_name} 輸入"
+      "record_value": {
+        "name": "{record_name} 數值"
+      }
+    },
+    "button": {
+      "record_log": {
+        "name": "{record_name} 紀錄"
       }
     },
     "text": {
-      "activity_note": {
-        "name": "{activity_name} 備註"
-      }
-    },
-    "sensor": {
-      "activity_record": {
-        "name": "{activity_name} 紀錄"
-      },
-      "growth_record": {
-        "name": "{growth_name} 紀錄"
+      "record_note": {
+        "name": "{record_name} 備註"
       }
     }
   },

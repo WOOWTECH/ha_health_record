@@ -24,100 +24,51 @@ async def async_setup_entry(
 
     entities: list[NumberEntity] = []
 
-    # Create amount input for each activity set
-    for activity_type, activity_set in coordinator.activity_sets.items():
+    for type_id in coordinator.record_sets:
         entities.append(
-            ActivityAmountNumber(
+            RecordValueNumber(
                 coordinator=coordinator,
-                activity_type=activity_type,
-            )
-        )
-
-    # Create value input for each growth set
-    for growth_type, growth_set in coordinator.growth_sets.items():
-        entities.append(
-            GrowthValueNumber(
-                coordinator=coordinator,
-                growth_type=growth_type,
+                type_id=type_id,
             )
         )
 
     async_add_entities(entities)
 
 
-class ActivityAmountNumber(NumberEntity):
-    """Number entity for activity amount input."""
+class RecordValueNumber(NumberEntity):
+    """Number entity for record value input."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_mode = NumberMode.BOX
     _attr_native_min_value = 0
     _attr_native_max_value = 10000
-    _attr_native_step = 1
-    _attr_translation_key = "activity_amount"
+    _attr_native_step = 0.1
+    _attr_translation_key = "record_value"
 
     def __init__(
         self,
         coordinator: HealthRecordCoordinator,
-        activity_type: str,
+        type_id: str,
     ) -> None:
         """Initialize the number entity."""
         self._coordinator = coordinator
-        self._activity_type = activity_type
-        activity_set = coordinator.get_activity_set(activity_type)
+        self._type_id = type_id
+        record_set = coordinator.get_record_set(type_id)
 
-        self._attr_unique_id = f"{coordinator.member_id}_{activity_type}_amount"
-        self._attr_translation_placeholders = {"activity_name": activity_set.name}
-        self._attr_native_unit_of_measurement = activity_set.unit
+        self._attr_unique_id = f"{coordinator.member_id}_{type_id}_value"
+        self._attr_translation_placeholders = {"record_name": record_set.name}
+        self._attr_native_unit_of_measurement = record_set.unit
         self._attr_device_info = coordinator.get_device_info()
         self._attr_icon = "mdi:numeric"
 
     @property
     def native_value(self) -> float | None:
         """Return the current value."""
-        activity_set = self._coordinator.get_activity_set(self._activity_type)
-        return activity_set.current_amount if activity_set else None
+        record_set = self._coordinator.get_record_set(self._type_id)
+        return record_set.current_value if record_set else None
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the value."""
-        self._coordinator.set_activity_amount(self._activity_type, value)
-        self.async_write_ha_state()
-
-
-class GrowthValueNumber(NumberEntity):
-    """Number entity for growth value input."""
-
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_has_entity_name = True
-    _attr_mode = NumberMode.BOX
-    _attr_native_min_value = 0
-    _attr_native_max_value = 1000
-    _attr_native_step = 0.1
-    _attr_translation_key = "growth_input"
-
-    def __init__(
-        self,
-        coordinator: HealthRecordCoordinator,
-        growth_type: str,
-    ) -> None:
-        """Initialize the number entity."""
-        self._coordinator = coordinator
-        self._growth_type = growth_type
-        growth_set = coordinator.get_growth_set(growth_type)
-
-        self._attr_unique_id = f"{coordinator.member_id}_{growth_type}_input"
-        self._attr_translation_placeholders = {"growth_name": growth_set.name}
-        self._attr_native_unit_of_measurement = growth_set.unit
-        self._attr_device_info = coordinator.get_device_info()
-        self._attr_icon = "mdi:human-male-height"
-
-    @property
-    def native_value(self) -> float | None:
-        """Return the current value."""
-        growth_set = self._coordinator.get_growth_set(self._growth_type)
-        return growth_set.current_value if growth_set else None
-
-    async def async_set_native_value(self, value: float) -> None:
-        """Set the value."""
-        self._coordinator.set_growth_value(self._growth_type, value)
+        self._coordinator.set_record_value(self._type_id, value)
         self.async_write_ha_state()

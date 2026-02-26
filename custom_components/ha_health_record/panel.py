@@ -15,7 +15,14 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 
-from .const import DOMAIN
+from .const import (
+    CONF_RECORD_NAME,
+    CONF_RECORD_SETS,
+    CONF_RECORD_TYPE,
+    CONF_RECORD_UNIT,
+    DOMAIN,
+    EVENT_RECORD_LOGGED,
+)
 from .coordinator import HealthRecordCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,20 +39,12 @@ def register_websocket_commands(hass: HomeAssistant) -> None:
     """Register all WebSocket commands (call once, not per entry)."""
     websocket_api.async_register_command(hass, ws_get_members)
     websocket_api.async_register_command(hass, ws_get_records)
-    websocket_api.async_register_command(hass, ws_log_activity)
-    websocket_api.async_register_command(hass, ws_update_growth)
-    # Record management APIs
+    websocket_api.async_register_command(hass, ws_log_record)
     websocket_api.async_register_command(hass, ws_update_record)
     websocket_api.async_register_command(hass, ws_delete_record)
-    # Activity type management APIs
-    websocket_api.async_register_command(hass, ws_add_activity_type)
-    websocket_api.async_register_command(hass, ws_update_activity_type)
-    websocket_api.async_register_command(hass, ws_delete_activity_type)
-    # Growth type management APIs
-    websocket_api.async_register_command(hass, ws_add_growth_type)
-    websocket_api.async_register_command(hass, ws_update_growth_type)
-    websocket_api.async_register_command(hass, ws_delete_growth_type)
-    # Member management APIs
+    websocket_api.async_register_command(hass, ws_add_record_type)
+    websocket_api.async_register_command(hass, ws_update_record_type)
+    websocket_api.async_register_command(hass, ws_delete_record_type)
     websocket_api.async_register_command(hass, ws_add_member)
     websocket_api.async_register_command(hass, ws_update_member)
     websocket_api.async_register_command(hass, ws_delete_member)
@@ -100,6 +99,21 @@ def _get_coordinators(hass: HomeAssistant) -> list[HealthRecordCoordinator]:
     return coordinators
 
 
+def _find_coordinator(
+    hass: HomeAssistant, member_id: str
+) -> HealthRecordCoordinator | None:
+    """Find a coordinator by member_id."""
+    for coord in _get_coordinators(hass):
+        if coord.member_id == member_id:
+            return coord
+    return None
+
+
+# ============================================================================
+# Query APIs
+# ============================================================================
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "ha_health_record/get_members",
@@ -118,21 +132,7 @@ def ws_get_members(
         member = {
             "id": coordinator.member_id,
             "name": coordinator.member_name,
-            "activity_sets": [
-                {
-                    "type": s.type_id,
-                    "name": s.name,
-                    "unit": s.unit,
-                    "current_amount": s.current_amount,
-                    "last_record": {
-                        "amount": s.last_record.amount,
-                        "note": s.last_record.note,
-                        "timestamp": s.last_record.timestamp.isoformat() if s.last_record.timestamp else None,
-                    } if s.last_record else None,
-                }
-                for s in coordinator.activity_sets.values()
-            ],
-            "growth_sets": [
+            "record_sets": [
                 {
                     "type": s.type_id,
                     "name": s.name,
@@ -140,10 +140,15 @@ def ws_get_members(
                     "current_value": s.current_value,
                     "last_record": {
                         "value": s.last_record.value,
-                        "timestamp": s.last_record.timestamp.isoformat() if s.last_record.timestamp else None,
+                        "note": s.last_record.note,
+                        "timestamp": (
+                            s.last_record.timestamp.isoformat()
+                            if s.last_record.timestamp
+                            else None
+                        ),
                     } if s.last_record else None,
                 }
-                for s in coordinator.growth_sets.values()
+                for s in coordinator.record_sets.values()
             ],
         }
         members.append(member)
@@ -185,42 +190,42 @@ def ws_get_records(
     connection.send_result(msg["id"], {"records": records})
 
 
+# ============================================================================
+# Record Logging API (unified)
+# ============================================================================
+
+
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "ha_health_record/log_activity",
+        vol.Required("type"): "ha_health_record/log_record",
         vol.Required("member_id"): str,
-        vol.Required("activity_type"): str,
-        vol.Required("amount"): valid_float,
+        vol.Required("record_type"): str,
+        vol.Required("value"): valid_float,
         vol.Optional("note", default=""): str,
         vol.Optional("timestamp"): str,
     }
 )
 @callback
-def ws_log_activity(
+def ws_log_record(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Handle log_activity WebSocket command."""
+    """Handle log_record WebSocket command."""
     member_id = msg["member_id"]
-    activity_type = msg["activity_type"]
-    amount = msg["amount"]
+    record_type = msg["record_type"]
+    value = msg["value"]
     note = msg.get("note", "")
     timestamp_str = msg.get("timestamp")
 
     # Find the coordinator
-    coordinator = None
-    for coord in _get_coordinators(hass):
-        if coord.member_id == member_id:
-            coordinator = coord
-            break
-
+    coordinator = _find_coordinator(hass, member_id)
     if coordinator is None:
         connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
         return
 
-    if activity_type not in coordinator.activity_sets:
-        connection.send_error(msg["id"], "activity_not_found", f"Activity {activity_type} not found")
+    if record_type not in coordinator.record_sets:
+        connection.send_error(msg["id"], "record_type_not_found", f"Record type {record_type} not found")
         return
 
     # Parse optional timestamp
@@ -233,98 +238,25 @@ def ws_log_activity(
             return
 
     # Set the values and log
-    coordinator.set_activity_amount(activity_type, amount)
-    coordinator.set_activity_note(activity_type, note)
-    record = coordinator.log_activity(activity_type, timestamp=custom_timestamp)
+    coordinator.set_record_value(record_type, value)
+    coordinator.set_record_note(record_type, note)
+    record = coordinator.log_record(record_type, timestamp=custom_timestamp)
 
     if record is None:
-        connection.send_error(msg["id"], "log_failed", "Failed to log activity")
+        connection.send_error(msg["id"], "log_failed", "Failed to log record")
         return
 
     # Fire event
-    activity_set = coordinator.get_activity_set(activity_type)
+    record_set = coordinator.get_record_set(record_type)
     hass.bus.async_fire(
-        f"{DOMAIN}_activity_logged",
+        EVENT_RECORD_LOGGED,
         {
             "member_id": coordinator.member_id,
             "member_name": coordinator.member_name,
-            "activity_type": activity_type,
-            "activity_name": activity_set.name,
-            "amount": record.amount,
-            "unit": activity_set.unit,
-            "note": record.note,
-            "timestamp": record.timestamp.isoformat() if record.timestamp else None,
-        },
-    )
-
-    connection.send_result(msg["id"], {"success": True})
-
-
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "ha_health_record/update_growth",
-        vol.Required("member_id"): str,
-        vol.Required("growth_type"): str,
-        vol.Required("value"): valid_float,
-        vol.Optional("note", default=""): str,
-        vol.Optional("timestamp"): str,
-    }
-)
-@callback
-def ws_update_growth(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Handle update_growth WebSocket command."""
-    member_id = msg["member_id"]
-    growth_type = msg["growth_type"]
-    value = msg["value"]
-    note = msg.get("note", "")
-    timestamp_str = msg.get("timestamp")
-
-    # Find the coordinator
-    coordinator = None
-    for coord in _get_coordinators(hass):
-        if coord.member_id == member_id:
-            coordinator = coord
-            break
-
-    if coordinator is None:
-        connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
-        return
-
-    if growth_type not in coordinator.growth_sets:
-        connection.send_error(msg["id"], "growth_not_found", f"Growth {growth_type} not found")
-        return
-
-    # Parse optional timestamp
-    custom_timestamp = None
-    if timestamp_str:
-        try:
-            custom_timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-        except ValueError:
-            connection.send_error(msg["id"], "invalid_timestamp", "Invalid timestamp format")
-            return
-
-    # Set the value
-    record = coordinator.set_growth_value(growth_type, value, note=note, timestamp=custom_timestamp)
-
-    if record is None:
-        connection.send_error(msg["id"], "update_failed", "Failed to update growth")
-        return
-
-    # Fire event for growth update
-    growth_set = coordinator.get_growth_set(growth_type)
-    hass.bus.async_fire(
-        f"{DOMAIN}_growth_updated",
-        {
-            "member_id": coordinator.member_id,
-            "member_name": coordinator.member_name,
-            "growth_type": growth_type,
-            "growth_name": growth_set.name,
+            "record_type": record_type,
+            "record_name": record_set.name if record_set else record_type,
             "value": record.value,
-            "unit": growth_set.unit,
+            "unit": record_set.unit if record_set else "",
             "note": record.note,
             "timestamp": record.timestamp.isoformat() if record.timestamp else None,
         },
@@ -337,15 +269,14 @@ def ws_update_growth(
 # Record Management APIs
 # ============================================================================
 
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "ha_health_record/update_record",
         vol.Required("member_id"): str,
-        vol.Required("record_type"): vol.In(["activity", "growth"]),
-        vol.Required("type_id"): str,  # activity_type or growth_type
+        vol.Required("type_id"): str,
         vol.Required("timestamp"): str,  # ISO format to identify the record
-        vol.Optional("record_id"): str,  # UUID – preferred over timestamp
-        vol.Optional("amount"): valid_float,
+        vol.Optional("record_id"): str,  # UUID -- preferred over timestamp
         vol.Optional("value"): valid_float,
         vol.Optional("note"): str,
         vol.Optional("new_timestamp"): str,  # New timestamp if editing time
@@ -359,30 +290,24 @@ def ws_update_record(
 ) -> None:
     """Handle update_record WebSocket command."""
     member_id = msg["member_id"]
-    record_type = msg["record_type"]
     type_id = msg["type_id"]
     timestamp = msg["timestamp"]
     record_id = msg.get("record_id")
 
     # Find the coordinator
-    coordinator = None
-    for coord in _get_coordinators(hass):
-        if coord.member_id == member_id:
-            coordinator = coord
-            break
-
+    coordinator = _find_coordinator(hass, member_id)
     if coordinator is None:
         connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
         return
 
     # Get the update values
-    amount = msg.get("amount") if record_type == "activity" else msg.get("value")
+    value = msg.get("value")
     note = msg.get("note")
     new_timestamp = msg.get("new_timestamp")
 
     if coordinator.update_record(
-        record_type, type_id, timestamp,
-        amount=amount, note=note, new_timestamp=new_timestamp,
+        type_id, timestamp,
+        value=value, note=note, new_timestamp=new_timestamp,
         record_id=record_id,
     ):
         connection.send_result(msg["id"], {"success": True})
@@ -394,10 +319,9 @@ def ws_update_record(
     {
         vol.Required("type"): "ha_health_record/delete_record",
         vol.Required("member_id"): str,
-        vol.Required("record_type"): vol.In(["activity", "growth"]),
         vol.Required("type_id"): str,
         vol.Required("timestamp"): str,
-        vol.Optional("record_id"): str,  # UUID – preferred over timestamp
+        vol.Optional("record_id"): str,  # UUID -- preferred over timestamp
     }
 )
 @callback
@@ -408,223 +332,30 @@ def ws_delete_record(
 ) -> None:
     """Handle delete_record WebSocket command."""
     member_id = msg["member_id"]
-    record_type = msg["record_type"]
     type_id = msg["type_id"]
     timestamp = msg["timestamp"]
     record_id = msg.get("record_id")
 
     # Find the coordinator
-    coordinator = None
-    for coord in _get_coordinators(hass):
-        if coord.member_id == member_id:
-            coordinator = coord
-            break
-
+    coordinator = _find_coordinator(hass, member_id)
     if coordinator is None:
         connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
         return
 
-    if coordinator.delete_record(record_type, type_id, timestamp, record_id=record_id):
+    if coordinator.delete_record(type_id, timestamp, record_id=record_id):
         connection.send_result(msg["id"], {"success": True})
     else:
         connection.send_error(msg["id"], "record_not_found", "Record not found")
 
 
 # ============================================================================
-# Activity Type Management APIs
+# Record Type Management APIs (unified)
 # ============================================================================
 
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "ha_health_record/add_activity_type",
-        vol.Required("member_id"): str,
-        vol.Required("name"): str,
-        vol.Required("unit"): str,
-        vol.Optional("default_amount", default=0): valid_float,
-    }
-)
-@websocket_api.async_response
-async def ws_add_activity_type(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Handle add_activity_type WebSocket command."""
-    member_id = msg["member_id"]
-    name = msg["name"]
-    unit = msg["unit"]
-    default_amount = msg.get("default_amount", 0)
-
-    # Generate type_id from name (sanitize)
-    type_id = name.lower().replace(" ", "_").replace("-", "_")
-    type_id = "".join(c for c in type_id if c.isalnum() or c == "_")
-
-    if not type_id:
-        connection.send_error(msg["id"], "invalid_type_id", "Name must contain at least one alphanumeric character")
-        return
-
-    # Find the config entry for this member
-    entry = None
-    for e in hass.config_entries.async_entries(DOMAIN):
-        if e.data.get("member_id") == member_id:
-            entry = e
-            break
-
-    if entry is None:
-        connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
-        return
-
-    # Get current activity sets
-    current_options = dict(entry.options)
-    activity_sets = list(current_options.get("activity_sets", []))
-
-    # Check if type already exists
-    for s in activity_sets:
-        if s.get("activity_type") == type_id:
-            connection.send_error(msg["id"], "type_exists", f"Activity type {type_id} already exists")
-            return
-
-    # Add new type
-    activity_sets.append({
-        "activity_type": type_id,
-        "activity_name": name,
-        "activity_unit": unit,
-        "default_amount": default_amount,
-    })
-
-    current_options["activity_sets"] = activity_sets
-
-    # Update config entry
-    hass.config_entries.async_update_entry(entry, options=current_options)
-
-    # Reload entry to create new entities
-    await hass.config_entries.async_reload(entry.entry_id)
-
-    connection.send_result(msg["id"], {"success": True, "type_id": type_id})
-
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "ha_health_record/update_activity_type",
-        vol.Required("member_id"): str,
-        vol.Required("type_id"): str,
-        vol.Required("name"): str,
-        vol.Required("unit"): str,
-        vol.Optional("default_amount"): valid_float,
-    }
-)
-@websocket_api.async_response
-async def ws_update_activity_type(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Handle update_activity_type WebSocket command."""
-    member_id = msg["member_id"]
-    type_id = msg["type_id"]
-    name = msg["name"]
-    unit = msg["unit"]
-    default_amount = msg.get("default_amount")
-
-    # Find the config entry for this member
-    entry = None
-    for e in hass.config_entries.async_entries(DOMAIN):
-        if e.data.get("member_id") == member_id:
-            entry = e
-            break
-
-    if entry is None:
-        connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
-        return
-
-    # Get current activity sets
-    current_options = dict(entry.options)
-    activity_sets = list(current_options.get("activity_sets", []))
-
-    # Find and update the type
-    found = False
-    for s in activity_sets:
-        if s.get("activity_type") == type_id:
-            s["activity_name"] = name
-            s["activity_unit"] = unit
-            if default_amount is not None:
-                s["default_amount"] = default_amount
-            found = True
-            break
-
-    if not found:
-        connection.send_error(msg["id"], "type_not_found", f"Activity type {type_id} not found")
-        return
-
-    current_options["activity_sets"] = activity_sets
-
-    # Update config entry
-    hass.config_entries.async_update_entry(entry, options=current_options)
-
-    # Reload entry to update entities
-    await hass.config_entries.async_reload(entry.entry_id)
-
-    connection.send_result(msg["id"], {"success": True})
-
-
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "ha_health_record/delete_activity_type",
-        vol.Required("member_id"): str,
-        vol.Required("type_id"): str,
-    }
-)
-@websocket_api.require_admin
-@websocket_api.async_response
-async def ws_delete_activity_type(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Handle delete_activity_type WebSocket command."""
-    member_id = msg["member_id"]
-    type_id = msg["type_id"]
-
-    # Find the config entry for this member
-    entry = None
-    for e in hass.config_entries.async_entries(DOMAIN):
-        if e.data.get("member_id") == member_id:
-            entry = e
-            break
-
-    if entry is None:
-        connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
-        return
-
-    # Get current activity sets
-    current_options = dict(entry.options)
-    activity_sets = list(current_options.get("activity_sets", []))
-
-    # Find and remove the type
-    new_sets = [s for s in activity_sets if s.get("activity_type") != type_id]
-
-    if len(new_sets) == len(activity_sets):
-        connection.send_error(msg["id"], "type_not_found", f"Activity type {type_id} not found")
-        return
-
-    current_options["activity_sets"] = new_sets
-
-    # Update config entry
-    hass.config_entries.async_update_entry(entry, options=current_options)
-
-    # Reload entry to remove entities
-    await hass.config_entries.async_reload(entry.entry_id)
-
-    connection.send_result(msg["id"], {"success": True})
-
-
-# ============================================================================
-# Growth Type Management APIs
-# ============================================================================
-
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "ha_health_record/add_growth_type",
+        vol.Required("type"): "ha_health_record/add_record_type",
         vol.Required("member_id"): str,
         vol.Required("name"): str,
         vol.Required("unit"): str,
@@ -632,12 +363,12 @@ async def ws_delete_activity_type(
     }
 )
 @websocket_api.async_response
-async def ws_add_growth_type(
+async def ws_add_record_type(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Handle add_growth_type WebSocket command."""
+    """Handle add_record_type WebSocket command."""
     member_id = msg["member_id"]
     name = msg["name"]
     unit = msg["unit"]
@@ -662,25 +393,25 @@ async def ws_add_growth_type(
         connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
         return
 
-    # Get current growth sets
+    # Get current record sets
     current_options = dict(entry.options)
-    growth_sets = list(current_options.get("growth_sets", []))
+    record_sets = list(current_options.get(CONF_RECORD_SETS, []))
 
-    # Check if type already exists
-    for s in growth_sets:
-        if s.get("growth_type") == type_id:
-            connection.send_error(msg["id"], "type_exists", f"Growth type {type_id} already exists")
+    # Check if type already exists across ALL record types
+    for s in record_sets:
+        if s.get(CONF_RECORD_TYPE) == type_id:
+            connection.send_error(msg["id"], "type_exists", f"Record type {type_id} already exists")
             return
 
     # Add new type
-    growth_sets.append({
-        "growth_type": type_id,
-        "growth_name": name,
-        "growth_unit": unit,
+    record_sets.append({
+        CONF_RECORD_TYPE: type_id,
+        CONF_RECORD_NAME: name,
+        CONF_RECORD_UNIT: unit,
         "default_value": default_value,
     })
 
-    current_options["growth_sets"] = growth_sets
+    current_options[CONF_RECORD_SETS] = record_sets
 
     # Update config entry
     hass.config_entries.async_update_entry(entry, options=current_options)
@@ -693,7 +424,7 @@ async def ws_add_growth_type(
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "ha_health_record/update_growth_type",
+        vol.Required("type"): "ha_health_record/update_record_type",
         vol.Required("member_id"): str,
         vol.Required("type_id"): str,
         vol.Required("name"): str,
@@ -702,12 +433,12 @@ async def ws_add_growth_type(
     }
 )
 @websocket_api.async_response
-async def ws_update_growth_type(
+async def ws_update_record_type(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Handle update_growth_type WebSocket command."""
+    """Handle update_record_type WebSocket command."""
     member_id = msg["member_id"]
     type_id = msg["type_id"]
     name = msg["name"]
@@ -725,26 +456,26 @@ async def ws_update_growth_type(
         connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
         return
 
-    # Get current growth sets
+    # Get current record sets
     current_options = dict(entry.options)
-    growth_sets = list(current_options.get("growth_sets", []))
+    record_sets = list(current_options.get(CONF_RECORD_SETS, []))
 
     # Find and update the type
     found = False
-    for s in growth_sets:
-        if s.get("growth_type") == type_id:
-            s["growth_name"] = name
-            s["growth_unit"] = unit
+    for s in record_sets:
+        if s.get(CONF_RECORD_TYPE) == type_id:
+            s[CONF_RECORD_NAME] = name
+            s[CONF_RECORD_UNIT] = unit
             if default_value is not None:
                 s["default_value"] = default_value
             found = True
             break
 
     if not found:
-        connection.send_error(msg["id"], "type_not_found", f"Growth type {type_id} not found")
+        connection.send_error(msg["id"], "type_not_found", f"Record type {type_id} not found")
         return
 
-    current_options["growth_sets"] = growth_sets
+    current_options[CONF_RECORD_SETS] = record_sets
 
     # Update config entry
     hass.config_entries.async_update_entry(entry, options=current_options)
@@ -757,19 +488,19 @@ async def ws_update_growth_type(
 
 @websocket_api.websocket_command(
     {
-        vol.Required("type"): "ha_health_record/delete_growth_type",
+        vol.Required("type"): "ha_health_record/delete_record_type",
         vol.Required("member_id"): str,
         vol.Required("type_id"): str,
     }
 )
 @websocket_api.require_admin
 @websocket_api.async_response
-async def ws_delete_growth_type(
+async def ws_delete_record_type(
     hass: HomeAssistant,
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Handle delete_growth_type WebSocket command."""
+    """Handle delete_record_type WebSocket command."""
     member_id = msg["member_id"]
     type_id = msg["type_id"]
 
@@ -784,18 +515,18 @@ async def ws_delete_growth_type(
         connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
         return
 
-    # Get current growth sets
+    # Get current record sets
     current_options = dict(entry.options)
-    growth_sets = list(current_options.get("growth_sets", []))
+    record_sets = list(current_options.get(CONF_RECORD_SETS, []))
 
     # Find and remove the type
-    new_sets = [s for s in growth_sets if s.get("growth_type") != type_id]
+    new_sets = [s for s in record_sets if s.get(CONF_RECORD_TYPE) != type_id]
 
-    if len(new_sets) == len(growth_sets):
-        connection.send_error(msg["id"], "type_not_found", f"Growth type {type_id} not found")
+    if len(new_sets) == len(record_sets):
+        connection.send_error(msg["id"], "type_not_found", f"Record type {type_id} not found")
         return
 
-    current_options["growth_sets"] = new_sets
+    current_options[CONF_RECORD_SETS] = new_sets
 
     # Update config entry
     hass.config_entries.async_update_entry(entry, options=current_options)

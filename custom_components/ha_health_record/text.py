@@ -24,49 +24,48 @@ async def async_setup_entry(
 
     entities: list[TextEntity] = []
 
-    # Create note input for each activity set
-    for activity_type, activity_set in coordinator.activity_sets.items():
+    for type_id in coordinator.record_sets:
         entities.append(
-            ActivityNoteText(
+            RecordNoteText(
                 coordinator=coordinator,
-                activity_type=activity_type,
+                type_id=type_id,
             )
         )
 
     async_add_entities(entities)
 
 
-class ActivityNoteText(TextEntity):
-    """Text entity for activity note input."""
+class RecordNoteText(TextEntity):
+    """Text entity for record note input."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_mode = TextMode.TEXT
     _attr_native_max = 255
-    _attr_translation_key = "activity_note"
+    _attr_translation_key = "record_note"
 
     def __init__(
         self,
         coordinator: HealthRecordCoordinator,
-        activity_type: str,
+        type_id: str,
     ) -> None:
         """Initialize the text entity."""
         self._coordinator = coordinator
-        self._activity_type = activity_type
-        activity_set = coordinator.get_activity_set(activity_type)
+        self._type_id = type_id
+        record_set = coordinator.get_record_set(type_id)
 
-        self._attr_unique_id = f"{coordinator.member_id}_{activity_type}_note"
-        self._attr_translation_placeholders = {"activity_name": activity_set.name}
+        self._attr_unique_id = f"{coordinator.member_id}_{type_id}_note"
+        self._attr_translation_placeholders = {"record_name": record_set.name}
         self._attr_device_info = coordinator.get_device_info()
         self._attr_icon = "mdi:note-text"
 
     @property
     def native_value(self) -> str | None:
         """Return the current value."""
-        activity_set = self._coordinator.get_activity_set(self._activity_type)
-        return activity_set.current_note if activity_set else None
+        record_set = self._coordinator.get_record_set(self._type_id)
+        return record_set.current_note if record_set else None
 
     async def async_set_value(self, value: str) -> None:
         """Set the value."""
-        self._coordinator.set_activity_note(self._activity_type, value)
+        self._coordinator.set_record_note(self._type_id, value)
         self.async_write_ha_state()
