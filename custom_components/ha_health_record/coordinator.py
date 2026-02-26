@@ -15,16 +15,12 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    CONF_ACTIVITY_NAME,
-    CONF_ACTIVITY_SETS,
-    CONF_ACTIVITY_TYPE,
-    CONF_ACTIVITY_UNIT,
-    CONF_GROWTH_NAME,
-    CONF_GROWTH_SETS,
-    CONF_GROWTH_TYPE,
-    CONF_GROWTH_UNIT,
     CONF_MEMBER_ID,
     CONF_MEMBER_NAME,
+    CONF_RECORD_NAME,
+    CONF_RECORD_SETS,
+    CONF_RECORD_TYPE,
+    CONF_RECORD_UNIT,
     DOMAIN,
     STORAGE_KEY,
     STORAGE_VERSION,
@@ -32,52 +28,18 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-SAVE_DELAY = 1  # seconds – batches rapid operations into a single write
-MAX_RECORDS = 10_000  # per record list – oldest records are pruned beyond this limit
+SAVE_DELAY = 1  # seconds -- batches rapid operations into a single write
+MAX_RECORDS = 10_000  # oldest records are pruned beyond this limit
 
 
-def signal_activity_updated(member_id: str, activity_type: str) -> str:
-    """Return signal name for activity update."""
-    return f"{DOMAIN}_{member_id}_{activity_type}_updated"
-
-
-def signal_growth_updated(member_id: str, growth_type: str) -> str:
-    """Return signal name for growth update."""
-    return f"{DOMAIN}_{member_id}_{growth_type}_updated"
+def signal_record_updated(member_id: str, type_id: str) -> str:
+    """Return signal name for record update."""
+    return f"{DOMAIN}_{member_id}_{type_id}_updated"
 
 
 @dataclass
-class ActivityRecord:
-    """Represents an activity record."""
-
-    amount: float | None = None
-    note: str = ""
-    timestamp: datetime | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for storage."""
-        return {
-            "amount": self.amount,
-            "note": self.note,
-            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ActivityRecord:
-        """Create from dictionary."""
-        timestamp = None
-        if data.get("timestamp"):
-            timestamp = dt_util.parse_datetime(data["timestamp"])
-        return cls(
-            amount=data.get("amount"),
-            note=data.get("note", ""),
-            timestamp=timestamp,
-        )
-
-
-@dataclass
-class GrowthRecord:
-    """Represents a growth record."""
+class Record:
+    """Represents a single health record entry."""
 
     value: float | None = None
     note: str = ""
@@ -92,55 +54,33 @@ class GrowthRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> GrowthRecord:
-        """Create from dictionary."""
+    def from_dict(cls, data: dict[str, Any]) -> Record:
+        """Create from dictionary.
+
+        Accepts both ``value`` and legacy ``amount`` keys for backward
+        compatibility during migration.
+        """
         timestamp = None
         if data.get("timestamp"):
             timestamp = dt_util.parse_datetime(data["timestamp"])
+        value = data.get("value") if data.get("value") is not None else data.get("amount")
         return cls(
-            value=data.get("value"),
+            value=value,
             note=data.get("note", ""),
             timestamp=timestamp,
         )
 
 
 @dataclass
-class ActivitySet:
-    """Represents an activity set configuration."""
-
-    type_id: str
-    name: str
-    unit: str
-    current_amount: float | None = None
-    current_note: str = ""
-    last_record: ActivityRecord = field(default_factory=ActivityRecord)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for storage."""
-        return {
-            "current_amount": self.current_amount,
-            "current_note": self.current_note,
-            "last_record": self.last_record.to_dict(),
-        }
-
-    def load_from_dict(self, data: dict[str, Any]) -> None:
-        """Load state from dictionary."""
-        self.current_amount = data.get("current_amount")
-        self.current_note = data.get("current_note", "")
-        if data.get("last_record"):
-            self.last_record = ActivityRecord.from_dict(data["last_record"])
-
-
-@dataclass
-class GrowthSet:
-    """Represents a growth set configuration."""
+class RecordSet:
+    """Represents a record set configuration (one type of measurement)."""
 
     type_id: str
     name: str
     unit: str
     current_value: float | None = None
     current_note: str = ""
-    last_record: GrowthRecord = field(default_factory=GrowthRecord)
+    last_record: Record = field(default_factory=Record)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
@@ -151,11 +91,18 @@ class GrowthSet:
         }
 
     def load_from_dict(self, data: dict[str, Any]) -> None:
-        """Load state from dictionary."""
-        self.current_value = data.get("current_value")
+        """Load state from dictionary.
+
+        Accepts both ``current_value`` and legacy ``current_amount`` keys.
+        """
+        self.current_value = (
+            data.get("current_value")
+            if data.get("current_value") is not None
+            else data.get("current_amount")
+        )
         self.current_note = data.get("current_note", "")
         if data.get("last_record"):
-            self.last_record = GrowthRecord.from_dict(data["last_record"])
+            self.last_record = Record.from_dict(data["last_record"])
 
 
 class HealthRecordCoordinator:
@@ -166,9 +113,8 @@ class HealthRecordCoordinator:
         self.hass = hass
         self.entry = entry
 
-        # Records history storage
-        self.activity_records: list[dict[str, Any]] = []
-        self.growth_records: list[dict[str, Any]] = []
+        # Records history storage (unified)
+        self.records: list[dict[str, Any]] = []
 
         # Member info
         self.member_id: str = entry.data[CONF_MEMBER_ID]
@@ -182,24 +128,31 @@ class HealthRecordCoordinator:
             atomic_writes=True,
         )
 
-        # Activity sets
-        self.activity_sets: dict[str, ActivitySet] = {}
-        for activity_data in entry.options.get(CONF_ACTIVITY_SETS, []):
-            type_id = activity_data[CONF_ACTIVITY_TYPE]
-            self.activity_sets[type_id] = ActivitySet(
-                type_id=type_id,
-                name=activity_data[CONF_ACTIVITY_NAME],
-                unit=activity_data[CONF_ACTIVITY_UNIT],
-            )
+        # Record sets (unified)
+        self.record_sets: dict[str, RecordSet] = {}
 
-        # Growth sets
-        self.growth_sets: dict[str, GrowthSet] = {}
-        for growth_data in entry.options.get(CONF_GROWTH_SETS, []):
-            type_id = growth_data[CONF_GROWTH_TYPE]
-            self.growth_sets[type_id] = GrowthSet(
+        record_sets_config = entry.options.get(CONF_RECORD_SETS, [])
+        if not record_sets_config:
+            # Fall back to old v1 format in entry.options
+            for act in entry.options.get("activity_sets", []):
+                record_sets_config.append({
+                    CONF_RECORD_TYPE: act.get("activity_type", ""),
+                    CONF_RECORD_NAME: act.get("activity_name", ""),
+                    CONF_RECORD_UNIT: act.get("activity_unit", ""),
+                })
+            for grw in entry.options.get("growth_sets", []):
+                record_sets_config.append({
+                    CONF_RECORD_TYPE: grw.get("growth_type", ""),
+                    CONF_RECORD_NAME: grw.get("growth_name", ""),
+                    CONF_RECORD_UNIT: grw.get("growth_unit", ""),
+                })
+
+        for rs_data in record_sets_config:
+            type_id = rs_data[CONF_RECORD_TYPE]
+            self.record_sets[type_id] = RecordSet(
                 type_id=type_id,
-                name=growth_data[CONF_GROWTH_NAME],
-                unit=growth_data[CONF_GROWTH_UNIT],
+                name=rs_data[CONF_RECORD_NAME],
+                unit=rs_data[CONF_RECORD_UNIT],
             )
 
     async def async_load(self) -> None:
@@ -209,30 +162,101 @@ class HealthRecordCoordinator:
             _LOGGER.debug("No stored data for member %s", self.member_id)
             return
 
-        # Load activity set states
-        activities_data = data.get("activity_sets", {})
-        for type_id, activity_set in self.activity_sets.items():
-            if type_id in activities_data:
-                activity_set.load_from_dict(activities_data[type_id])
+        # Detect v1 format and migrate
+        if "activity_sets" in data or "growth_sets" in data:
+            _LOGGER.info(
+                "Detected v1 storage format for member %s, migrating to v2",
+                self.member_id,
+            )
+            data = self._migrate_v1_to_v2(data)
 
-        # Load growth set states
-        growth_data = data.get("growth_sets", {})
-        for type_id, growth_set in self.growth_sets.items():
-            if type_id in growth_data:
-                growth_set.load_from_dict(growth_data[type_id])
+        # Load record set states
+        record_sets_data = data.get("record_sets", {})
+        for type_id, record_set in self.record_sets.items():
+            if type_id in record_sets_data:
+                record_set.load_from_dict(record_sets_data[type_id])
 
         # Load records history
-        self.activity_records = data.get("activity_records", [])
-        self.growth_records = data.get("growth_records", [])
+        self.records = data.get("records", [])
 
         _LOGGER.debug(
-            "Loaded health record data for member %s: %d activities, %d growth sets, %d activity records, %d growth records",
+            "Loaded health record data for member %s: %d record sets, %d records",
             self.member_id,
-            len(self.activity_sets),
-            len(self.growth_sets),
-            len(self.activity_records),
-            len(self.growth_records),
+            len(self.record_sets),
+            len(self.records),
         )
+
+    @staticmethod
+    def _migrate_v1_to_v2(data: dict[str, Any]) -> dict[str, Any]:
+        """Migrate v1 storage format to v2.
+
+        v1 had separate activity_sets/growth_sets and activity_records/growth_records.
+        v2 unifies them into record_sets and records.
+        """
+        migrated_record_sets: dict[str, Any] = {}
+        migrated_records: list[dict[str, Any]] = []
+
+        # Migrate activity_sets state
+        for type_id, aset_data in data.get("activity_sets", {}).items():
+            migrated_record_sets[type_id] = {
+                "current_value": aset_data.get("current_amount"),
+                "current_note": aset_data.get("current_note", ""),
+                "last_record": {},
+            }
+            if aset_data.get("last_record"):
+                lr = aset_data["last_record"]
+                migrated_record_sets[type_id]["last_record"] = {
+                    "value": lr.get("amount"),
+                    "note": lr.get("note", ""),
+                    "timestamp": lr.get("timestamp"),
+                }
+
+        # Migrate growth_sets state
+        for type_id, gset_data in data.get("growth_sets", {}).items():
+            migrated_record_sets[type_id] = {
+                "current_value": gset_data.get("current_value"),
+                "current_note": gset_data.get("current_note", ""),
+                "last_record": {},
+            }
+            if gset_data.get("last_record"):
+                lr = gset_data["last_record"]
+                migrated_record_sets[type_id]["last_record"] = {
+                    "value": lr.get("value"),
+                    "note": lr.get("note", ""),
+                    "timestamp": lr.get("timestamp"),
+                }
+
+        # Migrate activity_records
+        for rec in data.get("activity_records", []):
+            migrated_records.append({
+                "id": rec.get("id", uuid.uuid4().hex),
+                "record_type": rec.get("activity_type", ""),
+                "record_name": rec.get("activity_name", ""),
+                "value": rec.get("amount"),
+                "unit": rec.get("unit", ""),
+                "note": rec.get("note", ""),
+                "timestamp": rec.get("timestamp", ""),
+            })
+
+        # Migrate growth_records
+        for rec in data.get("growth_records", []):
+            migrated_records.append({
+                "id": rec.get("id", uuid.uuid4().hex),
+                "record_type": rec.get("growth_type", ""),
+                "record_name": rec.get("growth_name", ""),
+                "value": rec.get("value"),
+                "unit": rec.get("unit", ""),
+                "note": rec.get("note", ""),
+                "timestamp": rec.get("timestamp", ""),
+            })
+
+        # Sort merged records by timestamp
+        migrated_records.sort(key=lambda r: r.get("timestamp", ""))
+
+        return {
+            "record_sets": migrated_record_sets,
+            "records": migrated_records,
+        }
 
     @callback
     def _async_schedule_save(self) -> None:
@@ -243,27 +267,21 @@ class HealthRecordCoordinator:
     def _data_to_save(self) -> dict[str, Any]:
         """Return data to save to storage."""
         return {
-            "activity_sets": {
-                type_id: activity_set.to_dict()
-                for type_id, activity_set in self.activity_sets.items()
+            "record_sets": {
+                type_id: record_set.to_dict()
+                for type_id, record_set in self.record_sets.items()
             },
-            "growth_sets": {
-                type_id: growth_set.to_dict()
-                for type_id, growth_set in self.growth_sets.items()
-            },
-            "activity_records": self.activity_records,
-            "growth_records": self.growth_records,
+            "records": self.records,
         }
 
-    def _prune_records(self, records: list[dict[str, Any]], label: str) -> None:
+    def _prune_records(self) -> None:
         """Remove oldest records if the list exceeds MAX_RECORDS."""
-        overflow = len(records) - MAX_RECORDS
+        overflow = len(self.records) - MAX_RECORDS
         if overflow > 0:
-            del records[:overflow]
+            del self.records[:overflow]
             _LOGGER.warning(
-                "Pruned %d oldest %s record(s) for member %s (limit %d)",
+                "Pruned %d oldest record(s) for member %s (limit %d)",
                 overflow,
-                label,
                 self.member_id,
                 MAX_RECORDS,
             )
@@ -277,42 +295,44 @@ class HealthRecordCoordinator:
             model="Family Member",
         )
 
-    def set_activity_amount(self, activity_type: str, amount: float | None) -> None:
-        """Set the current amount for an activity."""
-        if activity_type in self.activity_sets:
-            self.activity_sets[activity_type].current_amount = amount
+    # ── Unified CRUD methods ────────────────────────────────────────
 
-    def set_activity_note(self, activity_type: str, note: str) -> None:
-        """Set the current note for an activity."""
-        if activity_type in self.activity_sets:
-            self.activity_sets[activity_type].current_note = note
+    def set_record_value(self, type_id: str, value: float | None) -> None:
+        """Set the current value for a record set."""
+        if type_id in self.record_sets:
+            self.record_sets[type_id].current_value = value
+
+    def set_record_note(self, type_id: str, note: str) -> None:
+        """Set the current note for a record set."""
+        if type_id in self.record_sets:
+            self.record_sets[type_id].current_note = note
 
     @callback
-    def log_activity(self, activity_type: str, timestamp: datetime | None = None) -> ActivityRecord | None:
-        """Log an activity and return the record."""
-        if activity_type not in self.activity_sets:
+    def log_record(self, type_id: str, timestamp: datetime | None = None) -> Record | None:
+        """Log a record and return it."""
+        if type_id not in self.record_sets:
             return None
 
-        activity_set = self.activity_sets[activity_type]
+        record_set = self.record_sets[type_id]
         record_timestamp = timestamp or dt_util.now()
-        record = ActivityRecord(
-            amount=activity_set.current_amount,
-            note=activity_set.current_note,
+        record = Record(
+            value=record_set.current_value,
+            note=record_set.current_note,
             timestamp=record_timestamp,
         )
-        activity_set.last_record = record
+        record_set.last_record = record
 
         # Add to records history
-        self.activity_records.append({
+        self.records.append({
             "id": uuid.uuid4().hex,
-            "activity_type": activity_type,
-            "activity_name": activity_set.name,
-            "amount": activity_set.current_amount,
-            "unit": activity_set.unit,
-            "note": activity_set.current_note,
+            "record_type": type_id,
+            "record_name": record_set.name,
+            "value": record_set.current_value,
+            "unit": record_set.unit,
+            "note": record_set.current_note,
             "timestamp": record_timestamp.isoformat(),
         })
-        self._prune_records(self.activity_records, "activity")
+        self._prune_records()
 
         # Schedule save
         self._async_schedule_save()
@@ -320,96 +340,28 @@ class HealthRecordCoordinator:
         # Notify sensor to update
         async_dispatcher_send(
             self.hass,
-            signal_activity_updated(self.member_id, activity_type),
+            signal_record_updated(self.member_id, type_id),
         )
 
         return record
 
-    @callback
-    def set_growth_value(self, growth_type: str, value: float | None, note: str = "", timestamp: datetime | None = None) -> GrowthRecord | None:
-        """Set the value for a growth measurement and return the record."""
-        if growth_type not in self.growth_sets:
-            return None
-
-        growth_set = self.growth_sets[growth_type]
-        growth_set.current_value = value
-        growth_set.current_note = note
-        record_timestamp = timestamp or dt_util.now()
-        record = GrowthRecord(
-            value=value,
-            note=note,
-            timestamp=record_timestamp,
-        )
-        growth_set.last_record = record
-
-        # Add to records history
-        self.growth_records.append({
-            "id": uuid.uuid4().hex,
-            "growth_type": growth_type,
-            "growth_name": growth_set.name,
-            "value": value,
-            "unit": growth_set.unit,
-            "note": note,
-            "timestamp": record_timestamp.isoformat(),
-        })
-        self._prune_records(self.growth_records, "growth")
-
-        # Schedule save
-        self._async_schedule_save()
-
-        # Notify sensor to update
-        async_dispatcher_send(
-            self.hass,
-            signal_growth_updated(self.member_id, growth_type),
-        )
-
-        return record
-
-    def get_activity_set(self, activity_type: str) -> ActivitySet | None:
-        """Get an activity set by type."""
-        return self.activity_sets.get(activity_type)
-
-    def get_growth_set(self, growth_type: str) -> GrowthSet | None:
-        """Get a growth set by type."""
-        return self.growth_sets.get(growth_type)
+    def get_record_set(self, type_id: str) -> RecordSet | None:
+        """Get a record set by type."""
+        return self.record_sets.get(type_id)
 
     def get_records_in_range(self, start_time: datetime, end_time: datetime) -> list[dict[str, Any]]:
         """Get all records in a time range."""
-        records = []
+        results: list[dict[str, Any]] = []
 
-        # Get activity records
-        for record in self.activity_records:
+        for record in self.records:
             try:
                 record_time = dt_util.parse_datetime(record["timestamp"])
                 if record_time and start_time <= record_time <= end_time:
                     entry = {
                         "member_id": self.member_id,
                         "member_name": self.member_name,
-                        "type": "activity",
-                        "activity_type": record["activity_type"],
-                        "activity_name": record["activity_name"],
-                        "amount": record["amount"],
-                        "unit": record["unit"],
-                        "note": record.get("note", ""),
-                        "timestamp": record["timestamp"],
-                    }
-                    if "id" in record:
-                        entry["id"] = record["id"]
-                    records.append(entry)
-            except (ValueError, TypeError):
-                continue
-
-        # Get growth records
-        for record in self.growth_records:
-            try:
-                record_time = dt_util.parse_datetime(record["timestamp"])
-                if record_time and start_time <= record_time <= end_time:
-                    entry = {
-                        "member_id": self.member_id,
-                        "member_name": self.member_name,
-                        "type": "growth",
-                        "growth_type": record["growth_type"],
-                        "growth_name": record["growth_name"],
+                        "record_type": record["record_type"],
+                        "record_name": record["record_name"],
                         "value": record["value"],
                         "unit": record["unit"],
                         "note": record.get("note", ""),
@@ -417,74 +369,51 @@ class HealthRecordCoordinator:
                     }
                     if "id" in record:
                         entry["id"] = record["id"]
-                    records.append(entry)
+                    results.append(entry)
             except (ValueError, TypeError):
                 continue
 
-        return records
+        return results
 
     def delete_record(
         self,
-        record_type: str,
         type_id: str,
         timestamp: str,
         record_id: str | None = None,
     ) -> bool:
         """Delete a record by UUID or type+timestamp fallback."""
-        records = (
-            self.activity_records if record_type == "activity"
-            else self.growth_records if record_type == "growth"
-            else None
-        )
-        if records is None:
-            return False
-
-        type_key = "activity_type" if record_type == "activity" else "growth_type"
-        for i, record in enumerate(records):
-            # Match by UUID first (new records), fall back to timestamp (legacy)
+        for i, record in enumerate(self.records):
+            # Match by UUID first (preferred), fall back to type+timestamp
             if record_id and record.get("id") == record_id:
-                del records[i]
+                del self.records[i]
                 self._async_schedule_save()
                 return True
-            if not record_id and record[type_key] == type_id and record["timestamp"] == timestamp:
-                del records[i]
+            if not record_id and record["record_type"] == type_id and record["timestamp"] == timestamp:
+                del self.records[i]
                 self._async_schedule_save()
                 return True
         return False
 
     def update_record(
         self,
-        record_type: str,
         type_id: str,
         timestamp: str,
-        amount: float | None = None,
+        value: float | None = None,
         note: str | None = None,
         new_timestamp: str | None = None,
         record_id: str | None = None,
     ) -> bool:
         """Update a record by UUID or type+timestamp fallback."""
-        records = (
-            self.activity_records if record_type == "activity"
-            else self.growth_records if record_type == "growth"
-            else None
-        )
-        if records is None:
-            return False
-
-        type_key = "activity_type" if record_type == "activity" else "growth_type"
-        value_key = "amount" if record_type == "activity" else "value"
-
-        for record in records:
-            # Match by UUID first (new records), fall back to timestamp (legacy)
+        for record in self.records:
             matched = False
             if record_id and record.get("id") == record_id:
                 matched = True
-            elif not record_id and record[type_key] == type_id and record["timestamp"] == timestamp:
+            elif not record_id and record["record_type"] == type_id and record["timestamp"] == timestamp:
                 matched = True
 
             if matched:
-                if amount is not None:
-                    record[value_key] = amount
+                if value is not None:
+                    record["value"] = value
                 if note is not None:
                     record["note"] = note
                 if new_timestamp is not None:
