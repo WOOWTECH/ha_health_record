@@ -50,34 +50,24 @@
   "options": {
     "step": {
       "init": {
-        "title": "Manage Sets",
+        "title": "Manage Record Types",
         "menu_options": {
-          "add_activity": "Add Activity Set",
-          "add_growth": "Add Growth Set",
+          "add_record_type": "Add Record Type",
           "manage_sets": "Manage Existing Sets"
         }
       },
-      "add_activity": {
-        "title": "Add Activity Set",
-        "description": "Select an activity type to track.",
+      "add_record_type": {
+        "title": "Add Record Type",
+        "description": "Select a record type to track.",
         "data": {
-          "activity_type": "Activity Type",
-          "activity_name": "Custom Name",
-          "activity_unit": "Custom Unit"
-        }
-      },
-      "add_growth": {
-        "title": "Add Growth Set",
-        "description": "Select a growth measurement to track.",
-        "data": {
-          "growth_type": "Growth Type",
-          "growth_name": "Custom Name",
-          "growth_unit": "Custom Unit"
+          "record_type": "Record Type",
+          "record_name": "Custom Name",
+          "record_unit": "Custom Unit"
         }
       },
       "manage_sets": {
         "title": "Manage Existing Sets",
-        "description": "Activity sets: {count_activity}, Growth sets: {count_growth}. Select sets to delete.",
+        "description": "Record sets: {count}. Select sets to delete.",
         "data": {
           "delete_sets": "Select sets to delete"
         }

@@ -48,34 +48,24 @@
   "options": {
     "step": {
       "init": {
-        "title": "管理套組",
+        "title": "管理紀錄類型",
         "menu_options": {
-          "add_activity": "新增活動套組",
-          "add_growth": "新增生長套組",
+          "add_record_type": "新增紀錄類型",
           "manage_sets": "管理現有套組"
         }
       },
-      "add_activity": {
-        "title": "新增活動套組",
-        "description": "選擇要追蹤的活動類型。",
+      "add_record_type": {
+        "title": "新增紀錄類型",
+        "description": "選擇要追蹤的紀錄類型。",
         "data": {
-          "activity_type": "活動類型",
-          "activity_name": "自訂名稱",
-          "activity_unit": "自訂單位"
-        }
-      },
-      "add_growth": {
-        "title": "新增生長套組",
-        "description": "選擇要追蹤的生長測量。",
-        "data": {
-          "growth_type": "生長類型",
-          "growth_name": "自訂名稱",
-          "growth_unit": "自訂單位"
+          "record_type": "紀錄類型",
+          "record_name": "自訂名稱",
+          "record_unit": "自訂單位"
         }
       },
       "manage_sets": {
         "title": "管理現有套組",
-        "description": "活動套組：{count_activity} 個，生長套組：{count_growth} 個。選擇要刪除的套組。",
+        "description": "紀錄套組：{count} 個。選擇要刪除的套組。",
         "data": {
           "delete_sets": "選擇要刪除的套組"
         }

@@ -18,19 +18,14 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
-    CONF_ACTIVITY_NAME,
-    CONF_ACTIVITY_SETS,
-    CONF_ACTIVITY_TYPE,
-    CONF_ACTIVITY_UNIT,
-    CONF_GROWTH_NAME,
-    CONF_GROWTH_SETS,
-    CONF_GROWTH_TYPE,
-    CONF_GROWTH_UNIT,
     CONF_MEMBER_ID,
     CONF_MEMBER_NAME,
+    CONF_RECORD_NAME,
+    CONF_RECORD_SETS,
+    CONF_RECORD_TYPE,
+    CONF_RECORD_UNIT,
     CUSTOM_TYPE,
-    DEFAULT_ACTIVITY_TYPES,
-    DEFAULT_GROWTH_TYPES,
+    DEFAULT_RECORD_TYPES,
     DOMAIN,
 )
 
@@ -48,7 +43,7 @@ def _sanitize_id(name: str) -> str:
 class HaHealthRecordConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Ha Health Record."""
 
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -75,8 +70,7 @@ class HaHealthRecordConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_MEMBER_NAME: user_input[CONF_MEMBER_NAME],
                     },
                     options={
-                        CONF_ACTIVITY_SETS: [],
-                        CONF_GROWTH_SETS: [],
+                        CONF_RECORD_SETS: [],
                     },
                 )
 
@@ -103,166 +97,93 @@ class HaHealthRecordConfigFlow(ConfigFlow, domain=DOMAIN):
 class HaHealthRecordOptionsFlow(OptionsFlow):
     """Handle options flow for Ha Health Record."""
 
-    _activity_sets: list[dict[str, Any]]
-    _growth_sets: list[dict[str, Any]]
+    _record_sets: list[dict[str, Any]]
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Manage the options - main menu."""
         # Deep copy options to avoid mutating the live config entry data
-        self._activity_sets = copy.deepcopy(
-            list(self.config_entry.options.get(CONF_ACTIVITY_SETS, []))
-        )
-        self._growth_sets = copy.deepcopy(
-            list(self.config_entry.options.get(CONF_GROWTH_SETS, []))
+        self._record_sets = copy.deepcopy(
+            list(self.config_entry.options.get(CONF_RECORD_SETS, []))
         )
         return self.async_show_menu(
             step_id="init",
-            menu_options=["add_activity", "add_growth", "manage_sets"],
+            menu_options=["add_record_type", "manage_sets"],
         )
 
-    async def async_step_add_activity(
+    async def async_step_add_record_type(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Add a new activity set."""
+        """Add a new record type."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            activity_type = user_input.get(CONF_ACTIVITY_TYPE)
+            record_type = user_input.get(CONF_RECORD_TYPE)
 
-            if activity_type == CUSTOM_TYPE:
+            if record_type == CUSTOM_TYPE:
                 # Custom type - use provided name and unit
-                activity_name = user_input.get(CONF_ACTIVITY_NAME, "").strip()
-                activity_unit = user_input.get(CONF_ACTIVITY_UNIT, "").strip()
+                record_name = user_input.get(CONF_RECORD_NAME, "").strip()
+                record_unit = user_input.get(CONF_RECORD_UNIT, "").strip()
 
-                if not activity_name:
-                    errors[CONF_ACTIVITY_NAME] = "required_name"
+                if not record_name:
+                    errors[CONF_RECORD_NAME] = "required_name"
                 else:
-                    activity_id = _sanitize_id(activity_name)
-                    if not activity_id:
-                        errors[CONF_ACTIVITY_NAME] = "invalid_name"
+                    record_id = _sanitize_id(record_name)
+                    if not record_id:
+                        errors[CONF_RECORD_NAME] = "invalid_name"
             else:
                 # Predefined type
                 preset = next(
-                    (t for t in DEFAULT_ACTIVITY_TYPES if t["id"] == activity_type),
+                    (t for t in DEFAULT_RECORD_TYPES if t["id"] == record_type),
                     None,
                 )
                 if preset:
-                    activity_id = preset["id"]
-                    activity_name = preset["name"]
-                    activity_unit = preset["unit"]
+                    record_id = preset["id"]
+                    record_name = preset["name"]
+                    record_unit = preset["unit"]
                 else:
                     errors["base"] = "invalid_type"
 
             if not errors:
                 # Check for duplicates
-                if any(s[CONF_ACTIVITY_TYPE] == activity_id for s in self._activity_sets):
+                if any(
+                    s[CONF_RECORD_TYPE] == record_id for s in self._record_sets
+                ):
                     errors["base"] = "duplicate_set"
                 else:
-                    self._activity_sets.append(
+                    self._record_sets.append(
                         {
-                            CONF_ACTIVITY_TYPE: activity_id,
-                            CONF_ACTIVITY_NAME: activity_name,
-                            CONF_ACTIVITY_UNIT: activity_unit,
+                            CONF_RECORD_TYPE: record_id,
+                            CONF_RECORD_NAME: record_name,
+                            CONF_RECORD_UNIT: record_unit,
                         }
                     )
                     return await self._save_options()
 
-        # Build activity type options
-        activity_options = [
-            selector.SelectOptionDict(value=t["id"], label=f"{t['name']} ({t['unit']})")
-            for t in DEFAULT_ACTIVITY_TYPES
+        # Build record type options
+        type_options = [
+            selector.SelectOptionDict(
+                value=t["id"], label=f"{t['name']} ({t['unit']})"
+            )
+            for t in DEFAULT_RECORD_TYPES
         ]
-        activity_options.append(
+        type_options.append(
             selector.SelectOptionDict(value=CUSTOM_TYPE, label=CUSTOM_TYPE_LABEL)
         )
 
         return self.async_show_form(
-            step_id="add_activity",
+            step_id="add_record_type",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_ACTIVITY_TYPE): selector.SelectSelector(
+                    vol.Required(CONF_RECORD_TYPE): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=activity_options,
+                            options=type_options,
                             mode=selector.SelectSelectorMode.LIST,
                         )
                     ),
-                    vol.Optional(CONF_ACTIVITY_NAME): str,
-                    vol.Optional(CONF_ACTIVITY_UNIT): str,
-                }
-            ),
-            errors=errors,
-        )
-
-    async def async_step_add_growth(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Add a new growth set."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            growth_type = user_input.get(CONF_GROWTH_TYPE)
-
-            if growth_type == CUSTOM_TYPE:
-                # Custom type
-                growth_name = user_input.get(CONF_GROWTH_NAME, "").strip()
-                growth_unit = user_input.get(CONF_GROWTH_UNIT, "").strip()
-
-                if not growth_name:
-                    errors[CONF_GROWTH_NAME] = "required_name"
-                else:
-                    growth_id = _sanitize_id(growth_name)
-                    if not growth_id:
-                        errors[CONF_GROWTH_NAME] = "invalid_name"
-            else:
-                # Predefined type
-                preset = next(
-                    (t for t in DEFAULT_GROWTH_TYPES if t["id"] == growth_type),
-                    None,
-                )
-                if preset:
-                    growth_id = preset["id"]
-                    growth_name = preset["name"]
-                    growth_unit = preset["unit"]
-                else:
-                    errors["base"] = "invalid_type"
-
-            if not errors:
-                # Check for duplicates
-                if any(s[CONF_GROWTH_TYPE] == growth_id for s in self._growth_sets):
-                    errors["base"] = "duplicate_set"
-                else:
-                    self._growth_sets.append(
-                        {
-                            CONF_GROWTH_TYPE: growth_id,
-                            CONF_GROWTH_NAME: growth_name,
-                            CONF_GROWTH_UNIT: growth_unit,
-                        }
-                    )
-                    return await self._save_options()
-
-        # Build growth type options
-        growth_options = [
-            selector.SelectOptionDict(value=t["id"], label=f"{t['name']} ({t['unit']})")
-            for t in DEFAULT_GROWTH_TYPES
-        ]
-        growth_options.append(
-            selector.SelectOptionDict(value=CUSTOM_TYPE, label=CUSTOM_TYPE_LABEL)
-        )
-
-        return self.async_show_form(
-            step_id="add_growth",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_GROWTH_TYPE): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=growth_options,
-                            mode=selector.SelectSelectorMode.LIST,
-                        )
-                    ),
-                    vol.Optional(CONF_GROWTH_NAME): str,
-                    vol.Optional(CONF_GROWTH_UNIT): str,
+                    vol.Optional(CONF_RECORD_NAME): str,
+                    vol.Optional(CONF_RECORD_UNIT): str,
                 }
             ),
             errors=errors,
@@ -275,41 +196,21 @@ class HaHealthRecordOptionsFlow(OptionsFlow):
         if user_input is not None:
             # Process deletions
             sets_to_delete = user_input.get("delete_sets", [])
-            for set_id in sets_to_delete:
-                parts = set_id.split(":", 1)
-                if len(parts) != 2:
-                    _LOGGER.warning("Skipping malformed set_id: %s", set_id)
-                    continue
-                set_type, set_name = parts
-                if set_type == "activity":
-                    self._activity_sets = [
-                        s for s in self._activity_sets
-                        if s[CONF_ACTIVITY_TYPE] != set_name
-                    ]
-                elif set_type == "growth":
-                    self._growth_sets = [
-                        s for s in self._growth_sets
-                        if s[CONF_GROWTH_TYPE] != set_name
-                    ]
-
+            self._record_sets = [
+                s
+                for s in self._record_sets
+                if s[CONF_RECORD_TYPE] not in sets_to_delete
+            ]
             return await self._save_options()
 
         # Build list of all sets
-        all_sets = []
-        for activity in self._activity_sets:
-            all_sets.append(
-                selector.SelectOptionDict(
-                    value=f"activity:{activity[CONF_ACTIVITY_TYPE]}",
-                    label=f"[Activity] {activity[CONF_ACTIVITY_NAME]} ({activity[CONF_ACTIVITY_UNIT]})",
-                )
+        all_sets = [
+            selector.SelectOptionDict(
+                value=rs[CONF_RECORD_TYPE],
+                label=f"{rs[CONF_RECORD_NAME]} ({rs[CONF_RECORD_UNIT]})",
             )
-        for growth in self._growth_sets:
-            all_sets.append(
-                selector.SelectOptionDict(
-                    value=f"growth:{growth[CONF_GROWTH_TYPE]}",
-                    label=f"[Growth] {growth[CONF_GROWTH_NAME]} ({growth[CONF_GROWTH_UNIT]})",
-                )
-            )
+            for rs in self._record_sets
+        ]
 
         if not all_sets:
             return self.async_abort(reason="no_sets")
@@ -328,8 +229,7 @@ class HaHealthRecordOptionsFlow(OptionsFlow):
                 }
             ),
             description_placeholders={
-                "count_activity": str(len(self._activity_sets)),
-                "count_growth": str(len(self._growth_sets)),
+                "count": str(len(self._record_sets)),
             },
         )
 
@@ -337,7 +237,6 @@ class HaHealthRecordOptionsFlow(OptionsFlow):
         """Save the options and create entry."""
         return self.async_create_entry(
             data={
-                CONF_ACTIVITY_SETS: self._activity_sets,
-                CONF_GROWTH_SETS: self._growth_sets,
+                CONF_RECORD_SETS: self._record_sets,
             },
         )

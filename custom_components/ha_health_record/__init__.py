@@ -8,7 +8,16 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import CONF_MEMBER_ID, DOMAIN, STORAGE_KEY, STORAGE_VERSION
+from .const import (
+    CONF_MEMBER_ID,
+    CONF_RECORD_NAME,
+    CONF_RECORD_SETS,
+    CONF_RECORD_TYPE,
+    CONF_RECORD_UNIT,
+    DOMAIN,
+    STORAGE_KEY,
+    STORAGE_VERSION,
+)
 from .coordinator import HealthRecordCoordinator
 from .panel import async_setup_panel, async_unload_panel, register_websocket_commands
 
@@ -26,6 +35,48 @@ PLATFORMS_LIST: list[Platform] = [
 # Keys for tracking one-time setup state in hass.data
 _KEY_WS_REGISTERED = f"{DOMAIN}_ws_registered"
 _KEY_PANEL_REGISTERED = f"{DOMAIN}_panel_registered"
+
+
+async def async_migrate_entry(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> bool:
+    """Migrate config entry from v1 to v2."""
+    if config_entry.version == 1:
+        _LOGGER.info(
+            "Migrating config entry %s from version 1 to 2", config_entry.title
+        )
+        record_sets: list[dict[str, str]] = []
+
+        for act in config_entry.options.get("activity_sets", []):
+            record_sets.append(
+                {
+                    CONF_RECORD_TYPE: act.get("activity_type", ""),
+                    CONF_RECORD_NAME: act.get("activity_name", ""),
+                    CONF_RECORD_UNIT: act.get("activity_unit", ""),
+                }
+            )
+        for grw in config_entry.options.get("growth_sets", []):
+            record_sets.append(
+                {
+                    CONF_RECORD_TYPE: grw.get("growth_type", ""),
+                    CONF_RECORD_NAME: grw.get("growth_name", ""),
+                    CONF_RECORD_UNIT: grw.get("growth_unit", ""),
+                }
+            )
+
+        hass.config_entries.async_update_entry(
+            config_entry,
+            options={CONF_RECORD_SETS: record_sets},
+            version=2,
+        )
+        config_entry.version = 2
+        _LOGGER.info(
+            "Migration complete for %s: %d record sets",
+            config_entry.title,
+            len(record_sets),
+        )
+
+    return True
 
 
 async def async_setup_entry(
