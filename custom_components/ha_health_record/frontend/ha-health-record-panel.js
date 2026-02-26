@@ -113,6 +113,11 @@ class HaHealthRecordPanel extends HTMLElement {
         confirmDeleteMessage: 'Are you sure you want to delete "{name}"?',
         loading: 'Loading...',
         menu: 'Menu',
+        totalRecords: 'Total Records',
+        activityRecordsCount: 'Activity Records',
+        growthRecordsCount: 'Growth Records',
+        lastRecord: 'Last Record',
+        noRecordsYet: 'No records yet',
       },
       'zh-Hant': {
         // Header
@@ -180,6 +185,11 @@ class HaHealthRecordPanel extends HTMLElement {
         confirmDeleteMessage: '確定要刪除「{name}」嗎？',
         loading: '載入中...',
         menu: '選單',
+        totalRecords: '總紀錄數',
+        activityRecordsCount: '活動紀錄',
+        growthRecordsCount: '生長紀錄',
+        lastRecord: '最新紀錄',
+        noRecordsYet: '尚無紀錄',
       },
       'zh-Hans': {
         // Header
@@ -247,6 +257,11 @@ class HaHealthRecordPanel extends HTMLElement {
         confirmDeleteMessage: '确定要删除"{name}"吗？',
         loading: '加载中...',
         menu: '菜单',
+        totalRecords: '总记录数',
+        activityRecordsCount: '活动记录',
+        growthRecordsCount: '生长记录',
+        lastRecord: '最新记录',
+        noRecordsYet: '尚无记录',
       },
     };
 
@@ -1022,42 +1037,113 @@ class HaHealthRecordPanel extends HTMLElement {
       }
       .filter-btn:hover { opacity: 0.9; }
 
-      /* MEMBER SELECTOR */
-      .member-selector {
-        min-width: 160px;
+      /* MEMBER SWITCHER - Chip-style cards */
+      .member-switcher-row {
+        display: flex;
+        align-items: center;
+        padding: 0 16px 16px 16px;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin: 0 -16px;
       }
-      .member-selector select {
-        width: 100%;
-        padding: 8px 12px;
-        font-size: 14px;
-        border: 1px solid var(--divider-color);
-        border-radius: 8px;
-        background: var(--card-background-color);
-        color: var(--primary-text-color);
-      }
-
-      /* MEMBER SELECTION CARD (like Finance Record account card) */
-      .member-selection-card {
+      .member-chip {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
         background: var(--card-background-color);
         border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+        box-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0,0,0,0.1));
+        min-width: 140px;
+      }
+      .member-chip:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+      }
+      .member-chip.active {
+        border-color: var(--primary-color);
+        background: var(--primary-color);
+      }
+      .member-chip.active .member-chip-name,
+      .member-chip.active .member-chip-stat {
+        color: var(--text-primary-color, white);
+      }
+      .member-chip-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 18px;
+        font-weight: 500;
+        flex-shrink: 0;
+      }
+      .member-chip.active .member-chip-avatar {
+        background: rgba(255,255,255,0.2);
+      }
+      .member-chip-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .member-chip-name {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--primary-text-color);
+      }
+      .member-chip-stat {
+        font-size: 12px;
+        color: var(--secondary-text-color);
+      }
+
+      /* MEMBER OVERVIEW CARD */
+      .overview-card {
+        background: var(--card-background-color);
+        border-radius: 8px;
         padding: 16px;
         margin-bottom: 16px;
         box-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0,0,0,0.1));
       }
-      .member-selection-card .card-title {
+      .overview-card-stat-label {
         font-size: 14px;
         color: var(--secondary-text-color);
-        margin-bottom: 8px;
+        margin-bottom: 4px;
       }
-      .member-selection-card select {
-        width: 100%;
-        padding: 12px 16px;
-        font-size: 16px;
-        font-weight: 500;
-        border: 1px solid var(--divider-color);
-        border-radius: 8px;
-        background: var(--card-background-color);
+      .overview-card-stat-primary {
+        font-size: 32px;
+        font-weight: bold;
         color: var(--primary-text-color);
+      }
+      .overview-card-details {
+        font-size: 14px;
+        color: var(--secondary-text-color);
+        margin-top: 8px;
+      }
+      .overview-stats-row {
+        display: flex;
+        gap: 24px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .overview-stat-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .overview-stat-value {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--primary-text-color);
+      }
+      .overview-stat-label {
+        font-size: 12px;
+        color: var(--secondary-text-color);
       }
 
       /* Tab Navigation */
@@ -1478,8 +1564,28 @@ class HaHealthRecordPanel extends HTMLElement {
           margin: 0 -8px 8px -8px;
           padding: 8px;
         }
-        .member-selector {
-          width: 100%;
+        .member-switcher-row {
+          padding: 0 8px 16px 8px;
+          overflow-x: auto;
+          flex-wrap: nowrap;
+          -webkit-overflow-scrolling: touch;
+          margin: 0 -8px;
+        }
+        .member-chip {
+          min-width: 130px;
+          flex-shrink: 0;
+          padding: 10px 14px;
+        }
+        .member-chip-avatar {
+          width: 36px;
+          height: 36px;
+          font-size: 16px;
+        }
+        .overview-card {
+          padding: 12px;
+        }
+        .overview-card-stat-primary {
+          font-size: 28px;
         }
       }
     `;
@@ -1498,6 +1604,16 @@ class HaHealthRecordPanel extends HTMLElement {
           <h1 class="top-bar-title">${this._t('title')}</h1>
         </div>
       `;
+
+      // Member Switcher Chips (always visible above tabs)
+      if (this.members.length > 0) {
+        content += this._renderMemberSwitcher();
+        // Member Overview Card
+        const selectedMemberOverview = this.members.find(m => m.id === this.selectedMemberId);
+        if (selectedMemberOverview) {
+          content += this._renderOverviewCard(selectedMemberOverview);
+        }
+      }
 
       // Tab Navigation
       content += `
@@ -1521,6 +1637,73 @@ class HaHealthRecordPanel extends HTMLElement {
 
     // Attach event listeners
     this._attachEventListeners();
+  }
+
+  _renderMemberSwitcher() {
+    let html = '<div class="member-switcher-row">';
+    for (const member of this.members) {
+      const isActive = member.id === this.selectedMemberId;
+      const initial = (member.name || '?').charAt(0).toUpperCase();
+      const actCount = (member.activity_sets || []).length;
+      const growCount = (member.growth_sets || []).length;
+      html += `
+        <div class="member-chip ${isActive ? 'active' : ''}" data-member-id="${member.id}">
+          <div class="member-chip-avatar">${initial}</div>
+          <div class="member-chip-info">
+            <div class="member-chip-name">${this._escapeHtml(member.name)}</div>
+            <div class="member-chip-stat">${actCount} ${this._t('activities')} / ${growCount} ${this._t('growth')}</div>
+          </div>
+        </div>
+      `;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  _renderOverviewCard(member) {
+    // Count records for this member in current date range
+    const memberRecords = this.records.filter(r => r.member_id === member.id);
+    const activityRecords = memberRecords.filter(r => r.type === 'activity');
+    const growthRecords = memberRecords.filter(r => r.type === 'growth');
+    const totalCount = memberRecords.length;
+
+    // Find last record
+    let lastRecordInfo = this._t('noRecordsYet');
+    if (memberRecords.length > 0) {
+      const sorted = [...memberRecords].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const last = sorted[0];
+      const typeName = last.activity_name || last.growth_name || last.activity_type || last.growth_type || '';
+      lastRecordInfo = `${this._formatDate(last.timestamp)} ${this._formatTime(last.timestamp)} - ${this._escapeHtml(typeName)}`;
+    }
+
+    const actTypeCount = (member.activity_sets || []).length;
+    const growTypeCount = (member.growth_sets || []).length;
+
+    return `
+      <div class="overview-card">
+        <div class="overview-card-stat-label">${this._t('totalRecords')}</div>
+        <div class="overview-card-stat-primary">${totalCount}</div>
+        <div class="overview-card-details">${this._t('lastRecord')}: ${lastRecordInfo}</div>
+        <div class="overview-stats-row">
+          <div class="overview-stat-item">
+            <div class="overview-stat-value">${activityRecords.length}</div>
+            <div class="overview-stat-label">${this._t('activityRecordsCount')}</div>
+          </div>
+          <div class="overview-stat-item">
+            <div class="overview-stat-value">${growthRecords.length}</div>
+            <div class="overview-stat-label">${this._t('growthRecordsCount')}</div>
+          </div>
+          <div class="overview-stat-item">
+            <div class="overview-stat-value">${actTypeCount}</div>
+            <div class="overview-stat-label">${this._t('activityTypes')}</div>
+          </div>
+          <div class="overview-stat-item">
+            <div class="overview-stat-value">${growTypeCount}</div>
+            <div class="overview-stat-label">${this._t('growthTypes')}</div>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   _renderRecordTab() {
@@ -1549,20 +1732,6 @@ class HaHealthRecordPanel extends HTMLElement {
         <span>${this._t('to')}</span>
         <input type="datetime-local" id="end-date" value="${this.endDate}">
         <button class="filter-btn" id="filter-btn">${this._t('filter')}</button>
-      </div>
-    `;
-
-    // Member Selection Card
-    html += `
-      <div class="member-selection-card">
-        <div class="card-title">${this._t('selectMember')}</div>
-        <select id="member-selector">
-          ${this.members.map(m => `
-            <option value="${m.id}" ${m.id === this.selectedMemberId ? 'selected' : ''}>
-              ${this._escapeHtml(m.name)}
-            </option>
-          `).join('')}
-        </select>
       </div>
     `;
 
@@ -1699,34 +1868,8 @@ class HaHealthRecordPanel extends HTMLElement {
     if (this.settingsSubTab === 'members') {
       html += this._renderMembersManagement();
     } else if (this.settingsSubTab === 'activityTypes') {
-      // Member selector for type management
-      html += `
-        <div class="member-selection-card">
-          <div class="card-title">${this._t('selectMember')}</div>
-          <select id="member-selector">
-            ${this.members.map(m => `
-              <option value="${m.id}" ${m.id === this.selectedMemberId ? 'selected' : ''}>
-                ${this._escapeHtml(m.name)}
-              </option>
-            `).join('')}
-          </select>
-        </div>
-      `;
       html += this._renderActivityTypesManagement();
     } else {
-      // Growth Types sub-tab
-      html += `
-        <div class="member-selection-card">
-          <div class="card-title">${this._t('selectMember')}</div>
-          <select id="member-selector">
-            ${this.members.map(m => `
-              <option value="${m.id}" ${m.id === this.selectedMemberId ? 'selected' : ''}>
-                ${this._escapeHtml(m.name)}
-              </option>
-            `).join('')}
-          </select>
-        </div>
-      `;
       html += this._renderGrowthTypesManagement();
     }
 
@@ -2166,11 +2309,16 @@ class HaHealthRecordPanel extends HTMLElement {
       searchInput.addEventListener('input', (e) => this._onSearchInput(e));
     }
 
-    // Member selector
-    const memberSelector = this.shadowRoot.querySelector('#member-selector');
-    if (memberSelector) {
-      memberSelector.addEventListener('change', (e) => this._onMemberChange(e));
-    }
+    // Member chip click handlers
+    this.shadowRoot.querySelectorAll('.member-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const memberId = chip.dataset.memberId;
+        if (memberId) {
+          this.selectedMemberId = memberId;
+          this._render();
+        }
+      });
+    });
 
     // Quick action buttons (activity)
     this.shadowRoot.querySelectorAll('.quick-action-btn:not(.growth-btn)').forEach(btn => {
