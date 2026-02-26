@@ -12,32 +12,24 @@ class HaHealthRecordPanel extends HTMLElement {
     this.showInputDialog = false;
     this.selectedMember = null;
     this.selectedType = '';
-    this.inputAmount = 0;
+    this.inputValue = 0;
     this.inputNote = '';
     this.submitting = false;
 
-    // Growth input dialog state
-    this.showGrowthDialog = false;
-    this.selectedGrowthType = '';
-    this.growthInputValue = 0;
-    this.growthInputNote = '';
-
     // Timestamp for logging (defaults to now)
     this.inputTimestamp = '';
-    this.growthTimestamp = '';
 
     // Tab state
     this.activeTab = 'record'; // 'record' | 'settings'
-    this.recordSubTab = 'activity'; // 'activity' | 'growth' - for Record tab
-    this.settingsSubTab = 'members'; // 'members' | 'activityTypes' | 'growthTypes'
+    this.settingsSubTab = 'members'; // 'members' | 'recordTypes'
     this.expandedRecordId = null;
-    this.editingRecord = null; // { amount, note }
+    this.editingRecord = null; // { value, note, timestamp }
     this.showTypeDialog = false;
-    this.editingType = null; // { mode: 'add'|'edit', category: 'activity'|'growth', data: {...} }
+    this.editingType = null; // { mode: 'add'|'edit', data: {...} }
     this.showMemberDialog = false;
     this.editingMember = null; // { mode: 'add'|'edit', data: {...} }
     this.showDeleteConfirm = false;
-    this.deleteTarget = null; // { type: 'record'|'activityType'|'growthType'|'member', id, name, memberId? }
+    this.deleteTarget = null; // { type: 'record'|'recordType'|'member', id, name, memberId? }
 
     // New: Selected member for filtering (like Finance Record's account selector)
     this.selectedMemberId = '';
@@ -59,25 +51,21 @@ class HaHealthRecordPanel extends HTMLElement {
         record: 'Record',
         settings: 'Settings',
         // Sub-tabs
-        activityTypes: 'Activity Types',
-        growthTypes: 'Growth Types',
+        recordTypes: 'Record Types',
         members: 'Members',
         // Timeline
         noMembers: 'No members configured. Go to the Settings tab to add members.',
         noRecords: 'No records for this date range.',
         // Manage
         noMembersManage: 'No members configured. Add a member first.',
-        noActivityTypes: 'No activity types configured for this member.',
-        noGrowthTypes: 'No growth types configured for this member.',
+        noRecordTypes: 'No record types configured for this member.',
         noMembersYet: 'No members configured yet.',
         member: 'Member',
         unit: 'Unit',
         current: 'Current',
-        activities: 'Activities',
-        growth: 'Growth',
+        records_label: 'Records',
         // Buttons
-        addActivityType: '+ Add Activity Type',
-        addGrowthType: '+ Add Growth Type',
+        addRecordType: '+ Add Record Type',
         addMember: '+ Add Member',
         save: 'Save',
         saving: 'Saving...',
@@ -86,23 +74,18 @@ class HaHealthRecordPanel extends HTMLElement {
         deleting: 'Deleting...',
         // Dialogs
         logFor: 'Log {type} for {name}',
-        recordGrowthFor: 'Record {type} for {name}',
-        amount: 'Amount',
         value: 'Value',
         note: 'Note',
         optionalNote: 'Optional note',
         timestamp: 'Time',
         now: 'Now',
-        addActivityTypeTitle: 'Add Activity Type',
-        editActivityTypeTitle: 'Edit Activity Type',
-        addGrowthTypeTitle: 'Add Growth Type',
-        editGrowthTypeTitle: 'Edit Growth Type',
+        addRecordTypeTitle: 'Add Record Type',
+        editRecordTypeTitle: 'Edit Record Type',
         addMemberTitle: 'Add Member',
         editMemberTitle: 'Edit Member',
         name: 'Name',
         namePlaceholder: 'e.g., Feeding',
         unitPlaceholder: 'e.g., ml',
-        defaultAmount: 'Default Amount',
         defaultValue: 'Default Value',
         memberNamePlaceholder: 'e.g., Baby Emma',
         memberIdLabel: 'ID (optional, auto-generated from name)',
@@ -114,10 +97,9 @@ class HaHealthRecordPanel extends HTMLElement {
         loading: 'Loading...',
         menu: 'Menu',
         totalRecords: 'Total Records',
-        activityRecordsCount: 'Activity Records',
-        growthRecordsCount: 'Growth Records',
         lastRecord: 'Last Record',
         noRecordsYet: 'No records yet',
+        recordTypesCount: 'Record Types',
       },
       'zh-Hant': {
         // Header
@@ -131,25 +113,21 @@ class HaHealthRecordPanel extends HTMLElement {
         record: '紀錄',
         settings: '設定',
         // Sub-tabs
-        activityTypes: '活動類型',
-        growthTypes: '生長類型',
+        recordTypes: '紀錄類型',
         members: '成員',
         // Timeline
         noMembers: '尚未設定成員。請前往「設定」分頁新增成員。',
         noRecords: '此日期範圍內沒有紀錄。',
         // Manage
         noMembersManage: '尚未設定成員。請先新增成員。',
-        noActivityTypes: '此成員尚未設定活動類型。',
-        noGrowthTypes: '此成員尚未設定生長類型。',
+        noRecordTypes: '此成員尚未設定紀錄類型。',
         noMembersYet: '尚未設定任何成員。',
         member: '成員',
         unit: '單位',
         current: '目前',
-        activities: '活動',
-        growth: '生長',
+        records_label: '紀錄',
         // Buttons
-        addActivityType: '+ 新增活動類型',
-        addGrowthType: '+ 新增生長類型',
+        addRecordType: '+ 新增紀錄類型',
         addMember: '+ 新增成員',
         save: '儲存',
         saving: '儲存中...',
@@ -158,23 +136,18 @@ class HaHealthRecordPanel extends HTMLElement {
         deleting: '刪除中...',
         // Dialogs
         logFor: '為 {name} 記錄 {type}',
-        recordGrowthFor: '為 {name} 記錄 {type}',
-        amount: '數值',
         value: '數值',
         note: '備註',
         optionalNote: '選填備註',
         timestamp: '時間',
         now: '現在',
-        addActivityTypeTitle: '新增活動類型',
-        editActivityTypeTitle: '編輯活動類型',
-        addGrowthTypeTitle: '新增生長類型',
-        editGrowthTypeTitle: '編輯生長類型',
+        addRecordTypeTitle: '新增紀錄類型',
+        editRecordTypeTitle: '編輯紀錄類型',
         addMemberTitle: '新增成員',
         editMemberTitle: '編輯成員',
         name: '名稱',
         namePlaceholder: '例如：餵食',
         unitPlaceholder: '例如：ml',
-        defaultAmount: '預設數值',
         defaultValue: '預設數值',
         memberNamePlaceholder: '例如：寶寶小明',
         memberIdLabel: 'ID（選填，將自動從名稱產生）',
@@ -186,10 +159,9 @@ class HaHealthRecordPanel extends HTMLElement {
         loading: '載入中...',
         menu: '選單',
         totalRecords: '總紀錄數',
-        activityRecordsCount: '活動紀錄',
-        growthRecordsCount: '生長紀錄',
         lastRecord: '最新紀錄',
         noRecordsYet: '尚無紀錄',
+        recordTypesCount: '紀錄類型',
       },
       'zh-Hans': {
         // Header
@@ -203,25 +175,21 @@ class HaHealthRecordPanel extends HTMLElement {
         record: '记录',
         settings: '设置',
         // Sub-tabs
-        activityTypes: '活动类型',
-        growthTypes: '生长类型',
+        recordTypes: '记录类型',
         members: '成员',
         // Timeline
         noMembers: '尚未设置成员。请前往"设置"标签页添加成员。',
         noRecords: '此日期范围内没有记录。',
         // Manage
         noMembersManage: '尚未设置成员。请先添加成员。',
-        noActivityTypes: '此成员尚未设置活动类型。',
-        noGrowthTypes: '此成员尚未设置生长类型。',
+        noRecordTypes: '此成员尚未设置记录类型。',
         noMembersYet: '尚未设置任何成员。',
         member: '成员',
         unit: '单位',
         current: '当前',
-        activities: '活动',
-        growth: '生长',
+        records_label: '记录',
         // Buttons
-        addActivityType: '+ 添加活动类型',
-        addGrowthType: '+ 添加生长类型',
+        addRecordType: '+ 添加记录类型',
         addMember: '+ 添加成员',
         save: '保存',
         saving: '保存中...',
@@ -230,23 +198,18 @@ class HaHealthRecordPanel extends HTMLElement {
         deleting: '删除中...',
         // Dialogs
         logFor: '为 {name} 记录 {type}',
-        recordGrowthFor: '为 {name} 记录 {type}',
-        amount: '数值',
         value: '数值',
         note: '备注',
         optionalNote: '可选备注',
         timestamp: '时间',
         now: '现在',
-        addActivityTypeTitle: '添加活动类型',
-        editActivityTypeTitle: '编辑活动类型',
-        addGrowthTypeTitle: '添加生长类型',
-        editGrowthTypeTitle: '编辑生长类型',
+        addRecordTypeTitle: '添加记录类型',
+        editRecordTypeTitle: '编辑记录类型',
         addMemberTitle: '添加成员',
         editMemberTitle: '编辑成员',
         name: '名称',
         namePlaceholder: '例如：喂食',
         unitPlaceholder: '例如：ml',
-        defaultAmount: '默认数值',
         defaultValue: '默认数值',
         memberNamePlaceholder: '例如：宝宝小明',
         memberIdLabel: 'ID（可选，将自动从名称生成）',
@@ -258,10 +221,9 @@ class HaHealthRecordPanel extends HTMLElement {
         loading: '加载中...',
         menu: '菜单',
         totalRecords: '总记录数',
-        activityRecordsCount: '活动记录',
-        growthRecordsCount: '生长记录',
         lastRecord: '最新记录',
         noRecordsYet: '尚无记录',
+        recordTypesCount: '记录类型',
       },
     };
 
@@ -379,14 +341,16 @@ class HaHealthRecordPanel extends HTMLElement {
   }
 
   _generateRecordId(record) {
-    return `${record.member_id}_${record.type}_${record.activity_type || record.growth_type}_${record.timestamp}`;
+    // Use UUID if available, otherwise fall back to composite key
+    if (record.id) return record.id;
+    return `${record.member_id}_${record.record_type}_${record.timestamp}`;
   }
 
-  _openInputDialog(member, type) {
+  _openInputDialog(member, recordType) {
     this.selectedMember = member;
-    this.selectedType = type;
-    const typeInfo = member.activity_sets?.find(s => s.type === type);
-    this.inputAmount = typeInfo?.current_amount || 0;
+    this.selectedType = recordType;
+    const typeInfo = (member.record_sets || []).find(s => s.type === recordType);
+    this.inputValue = typeInfo?.current_value || 0;
     this.inputNote = '';
     this.inputTimestamp = this._toLocalISOString(new Date());
     this.showInputDialog = true;
@@ -408,10 +372,10 @@ class HaHealthRecordPanel extends HTMLElement {
 
     try {
       await this._hass.callWS({
-        type: 'ha_health_record/log_activity',
+        type: 'ha_health_record/log_record',
         member_id: this.selectedMember.id,
-        activity_type: this.selectedType,
-        amount: this.inputAmount || 0,
+        record_type: this.selectedType,
+        value: this.inputValue || 0,
         note: this.inputNote || '',
         timestamp: this.inputTimestamp ? new Date(this.inputTimestamp).toISOString() : undefined,
       });
@@ -419,54 +383,8 @@ class HaHealthRecordPanel extends HTMLElement {
       this._closeInputDialog();
       await this._loadRecords();
     } catch (error) {
-      console.error('Error logging activity:', error);
-      alert('Failed to log activity: ' + error.message);
-    }
-
-    this.submitting = false;
-    this._render();
-  }
-
-  // Growth dialog methods
-  _openGrowthDialog(member, growthType) {
-    this.selectedMember = member;
-    this.selectedGrowthType = growthType;
-    const typeInfo = member.growth_sets?.find(s => s.type === growthType);
-    this.growthInputValue = typeInfo?.current_value || 0;
-    this.growthInputNote = '';
-    this.growthTimestamp = this._toLocalISOString(new Date());
-    this.showGrowthDialog = true;
-    this._render();
-  }
-
-  _closeGrowthDialog() {
-    this.showGrowthDialog = false;
-    this.selectedMember = null;
-    this.selectedGrowthType = '';
-    this._render();
-  }
-
-  async _submitGrowth() {
-    if (!this.selectedMember || !this.selectedGrowthType || this.submitting) return;
-
-    this.submitting = true;
-    this._render();
-
-    try {
-      await this._hass.callWS({
-        type: 'ha_health_record/update_growth',
-        member_id: this.selectedMember.id,
-        growth_type: this.selectedGrowthType,
-        value: this.growthInputValue || 0,
-        note: this.growthInputNote || '',
-        timestamp: this.growthTimestamp ? new Date(this.growthTimestamp).toISOString() : undefined,
-      });
-
-      this._closeGrowthDialog();
-      await this._loadRecords();
-    } catch (error) {
-      console.error('Error recording growth:', error);
-      alert('Failed to record growth: ' + error.message);
+      console.error('Error logging record:', error);
+      alert('Failed to log record: ' + error.message);
     }
 
     this.submitting = false;
@@ -501,8 +419,8 @@ class HaHealthRecordPanel extends HTMLElement {
   }
 
   // Get filtered records based on member and search
-  _getFilteredRecords(subTab = 'activity') {
-    let filtered = this.records.filter(r => r.type === subTab);
+  _getFilteredRecords() {
+    let filtered = [...this.records];
 
     // Filter by selected member
     if (this.selectedMemberId) {
@@ -514,10 +432,10 @@ class HaHealthRecordPanel extends HTMLElement {
       const query = this.searchQuery.toLowerCase().trim();
       filtered = filtered.filter(r => {
         const note = (r.note || '').toLowerCase();
-        const typeName = (r.activity_name || r.growth_name || r.activity_type || r.growth_type || '').toLowerCase();
+        const typeName = (r.record_name || r.record_type || '').toLowerCase();
         const memberName = (r.member_name || '').toLowerCase();
-        const amount = String(r.amount || r.value || '');
-        return note.includes(query) || typeName.includes(query) || memberName.includes(query) || amount.includes(query);
+        const val = String(r.value || '');
+        return note.includes(query) || typeName.includes(query) || memberName.includes(query) || val.includes(query);
       });
     }
 
@@ -530,11 +448,6 @@ class HaHealthRecordPanel extends HTMLElement {
 
   _switchTab(tab) {
     this.activeTab = tab;
-    this._render();
-  }
-
-  _switchRecordSubTab(subTab) {
-    this.recordSubTab = subTab;
     this._render();
   }
 
@@ -557,7 +470,7 @@ class HaHealthRecordPanel extends HTMLElement {
       // Convert ISO timestamp to datetime-local format
       const timestamp = record.timestamp ? this._toLocalISOString(new Date(record.timestamp)) : '';
       this.editingRecord = {
-        amount: record.amount || record.value || 0,
+        value: record.value || 0,
         note: record.note || '',
         timestamp: timestamp,
       };
@@ -571,16 +484,15 @@ class HaHealthRecordPanel extends HTMLElement {
     this._render();
 
     try {
-      const isActivity = record.type === 'activity';
       // Convert datetime-local value to ISO string for new_timestamp
       const newTimestamp = this.editingRecord.timestamp ? new Date(this.editingRecord.timestamp).toISOString() : null;
       await this._hass.callWS({
         type: 'ha_health_record/update_record',
         member_id: record.member_id,
-        record_type: record.type,
-        type_id: isActivity ? record.activity_type : record.growth_type,
+        type_id: record.record_type,
         timestamp: record.timestamp,
-        ...(isActivity ? { amount: this.editingRecord.amount } : { value: this.editingRecord.amount }),
+        ...(record.id ? { record_id: record.id } : {}),
+        value: this.editingRecord.value,
         note: this.editingRecord.note,
         ...(newTimestamp && newTimestamp !== record.timestamp ? { new_timestamp: newTimestamp } : {}),
       });
@@ -607,7 +519,7 @@ class HaHealthRecordPanel extends HTMLElement {
     this.deleteTarget = {
       type: 'record',
       id: this._generateRecordId(record),
-      name: `${record.activity_name || record.growth_name} record`,
+      name: `${record.record_name || record.record_type} record`,
       record: record,
     };
     this.showDeleteConfirm = true;
@@ -615,30 +527,28 @@ class HaHealthRecordPanel extends HTMLElement {
   }
 
   // ============================================================================
-  // Type Management (Activity/Growth)
+  // Type Management (unified Record Types)
   // ============================================================================
 
-  _openAddTypeDialog(category) {
+  _openAddTypeDialog() {
     this.editingType = {
       mode: 'add',
-      category: category,
       memberId: this.selectedMemberId || this.members[0]?.id || '',
-      data: { name: '', unit: '', default_amount: 0 },
+      data: { name: '', unit: '', default_value: 0 },
     };
     this.showTypeDialog = true;
     this._render();
   }
 
-  _openEditTypeDialog(category, memberId, typeData) {
+  _openEditTypeDialog(memberId, typeData) {
     this.editingType = {
       mode: 'edit',
-      category: category,
       memberId: memberId,
       typeId: typeData.type,
       data: {
         name: typeData.name,
         unit: typeData.unit,
-        default_amount: typeData.current_amount || typeData.current_value || 0,
+        default_value: typeData.current_value || 0,
       },
     };
     this.showTypeDialog = true;
@@ -657,32 +567,24 @@ class HaHealthRecordPanel extends HTMLElement {
     this._render();
 
     try {
-      const { mode, category, memberId, typeId, data } = this.editingType;
+      const { mode, memberId, typeId, data } = this.editingType;
 
       if (mode === 'add') {
-        const wsType = category === 'activity'
-          ? 'ha_health_record/add_activity_type'
-          : 'ha_health_record/add_growth_type';
-
         await this._hass.callWS({
-          type: wsType,
+          type: 'ha_health_record/add_record_type',
           member_id: memberId,
           name: data.name,
           unit: data.unit,
-          ...(category === 'activity' ? { default_amount: data.default_amount } : { default_value: data.default_amount }),
+          default_value: data.default_value,
         });
       } else {
-        const wsType = category === 'activity'
-          ? 'ha_health_record/update_activity_type'
-          : 'ha_health_record/update_growth_type';
-
         await this._hass.callWS({
-          type: wsType,
+          type: 'ha_health_record/update_record_type',
           member_id: memberId,
           type_id: typeId,
           name: data.name,
           unit: data.unit,
-          ...(category === 'activity' ? { default_amount: data.default_amount } : { default_value: data.default_amount }),
+          default_value: data.default_value,
         });
       }
 
@@ -703,7 +605,6 @@ class HaHealthRecordPanel extends HTMLElement {
     // The backend reloads the config entry which takes some time
     // Save current URL and tab state before reload
     const currentTab = this.activeTab;
-    const currentSubTab = this.recordSubTab;
     const currentSettingsSubTab = this.settingsSubTab;
     const panelUrl = '/ha-health-record';
 
@@ -728,7 +629,6 @@ class HaHealthRecordPanel extends HTMLElement {
         await this._loadData();
         // Restore tab state
         this.activeTab = currentTab;
-        this.recordSubTab = currentSubTab;
         this.settingsSubTab = currentSettingsSubTab;
         this._render();
         return; // Success
@@ -741,9 +641,9 @@ class HaHealthRecordPanel extends HTMLElement {
     }
   }
 
-  _showDeleteTypeConfirm(category, memberId, typeData) {
+  _showDeleteTypeConfirm(memberId, typeData) {
     this.deleteTarget = {
-      type: category === 'activity' ? 'activityType' : 'growthType',
+      type: 'recordType',
       id: typeData.type,
       name: typeData.name,
       memberId: memberId,
@@ -851,22 +751,14 @@ class HaHealthRecordPanel extends HTMLElement {
           await this._hass.callWS({
             type: 'ha_health_record/delete_record',
             member_id: record.member_id,
-            record_type: record.type,
-            type_id: record.activity_type || record.growth_type,
+            type_id: record.record_type,
             timestamp: record.timestamp,
+            ...(record.id ? { record_id: record.id } : {}),
           });
           break;
-        case 'activityType':
+        case 'recordType':
           await this._hass.callWS({
-            type: 'ha_health_record/delete_activity_type',
-            member_id: memberId,
-            type_id: id,
-          });
-          needsReloadWait = true;
-          break;
-        case 'growthType':
-          await this._hass.callWS({
-            type: 'ha_health_record/delete_growth_type',
+            type: 'ha_health_record/delete_record_type',
             member_id: memberId,
             type_id: id,
           });
@@ -1262,10 +1154,6 @@ class HaHealthRecordPanel extends HTMLElement {
       }
       .quick-actions button:hover {
         opacity: 0.9;
-      }
-      /* Changed: growth buttons now use primary color instead of green */
-      .quick-actions button.growth-btn {
-        background: var(--primary-color, #03a9f4);
       }
       .timeline-section {
         background: var(--card-background-color, white);
@@ -1673,14 +1561,13 @@ class HaHealthRecordPanel extends HTMLElement {
     for (const member of this.members) {
       const isActive = member.id === this.selectedMemberId;
       const initial = (member.name || '?').charAt(0).toUpperCase();
-      const actCount = (member.activity_sets || []).length;
-      const growCount = (member.growth_sets || []).length;
+      const typeCount = (member.record_sets || []).length;
       html += `
         <div class="member-chip ${isActive ? 'active' : ''}" data-member-id="${member.id}">
           <div class="member-chip-avatar">${initial}</div>
           <div class="member-chip-info">
             <div class="member-chip-name">${this._escapeHtml(member.name)}</div>
-            <div class="member-chip-stat">${actCount} ${this._t('activities')} / ${growCount} ${this._t('growth')}</div>
+            <div class="member-chip-stat">${typeCount} ${this._t('recordTypes')}</div>
           </div>
         </div>
       `;
@@ -1698,8 +1585,6 @@ class HaHealthRecordPanel extends HTMLElement {
   _renderOverviewCard(member) {
     // Count records for this member in current date range
     const memberRecords = this.records.filter(r => r.member_id === member.id);
-    const activityRecords = memberRecords.filter(r => r.type === 'activity');
-    const growthRecords = memberRecords.filter(r => r.type === 'growth');
     const totalCount = memberRecords.length;
 
     // Find last record
@@ -1707,12 +1592,11 @@ class HaHealthRecordPanel extends HTMLElement {
     if (memberRecords.length > 0) {
       const sorted = [...memberRecords].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       const last = sorted[0];
-      const typeName = last.activity_name || last.growth_name || last.activity_type || last.growth_type || '';
+      const typeName = last.record_name || last.record_type || '';
       lastRecordInfo = `${this._formatDate(last.timestamp)} ${this._formatTime(last.timestamp)} - ${this._escapeHtml(typeName)}`;
     }
 
-    const actTypeCount = (member.activity_sets || []).length;
-    const growTypeCount = (member.growth_sets || []).length;
+    const typeCount = (member.record_sets || []).length;
 
     return `
       <div class="overview-card">
@@ -1721,20 +1605,8 @@ class HaHealthRecordPanel extends HTMLElement {
         <div class="overview-card-details">${this._t('lastRecord')}: ${lastRecordInfo}</div>
         <div class="overview-stats-row">
           <div class="overview-stat-item">
-            <div class="overview-stat-value">${activityRecords.length}</div>
-            <div class="overview-stat-label">${this._t('activityRecordsCount')}</div>
-          </div>
-          <div class="overview-stat-item">
-            <div class="overview-stat-value">${growthRecords.length}</div>
-            <div class="overview-stat-label">${this._t('growthRecordsCount')}</div>
-          </div>
-          <div class="overview-stat-item">
-            <div class="overview-stat-value">${actTypeCount}</div>
-            <div class="overview-stat-label">${this._t('activityTypes')}</div>
-          </div>
-          <div class="overview-stat-item">
-            <div class="overview-stat-value">${growTypeCount}</div>
-            <div class="overview-stat-label">${this._t('growthTypes')}</div>
+            <div class="overview-stat-value">${typeCount}</div>
+            <div class="overview-stat-label">${this._t('recordTypesCount')}</div>
           </div>
         </div>
       </div>
@@ -1770,22 +1642,11 @@ class HaHealthRecordPanel extends HTMLElement {
       </div>
     `;
 
-    // Sub-tabs for Activity/Growth
-    html += `
-      <div class="sub-tabs">
-        <button class="sub-tab ${this.recordSubTab === 'activity' ? 'active' : ''}" data-subtab="activity">${this._t('activities')}</button>
-        <button class="sub-tab ${this.recordSubTab === 'growth' ? 'active' : ''}" data-subtab="growth">${this._t('growth')}</button>
-      </div>
-    `;
-
-    // Quick action buttons for selected member
+    // Quick action buttons for selected member (all record types as buttons, no category split)
     const selectedMember = this.members.find(m => m.id === this.selectedMemberId);
     if (selectedMember) {
       const memberJson = JSON.stringify(selectedMember).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-
-      const sets = this.recordSubTab === 'activity'
-        ? (selectedMember.activity_sets || [])
-        : (selectedMember.growth_sets || []);
+      const sets = selectedMember.record_sets || [];
 
       if (sets.length > 0) {
         html += `
@@ -1794,34 +1655,24 @@ class HaHealthRecordPanel extends HTMLElement {
             <div class="quick-actions">
         `;
 
-        if (this.recordSubTab === 'activity') {
-          for (const activity of sets) {
-            html += `
-              <button class="quick-action-btn" data-member='${memberJson}' data-type="${activity.type}">
-                ${this._escapeHtml(activity.name || activity.type)}
-              </button>
-            `;
-          }
-        } else {
-          for (const growth of sets) {
-            html += `
-              <button class="quick-action-btn growth-btn" data-member='${memberJson}' data-growth-type="${growth.type}">
-                ${this._escapeHtml(growth.name || growth.type)}
-              </button>
-            `;
-          }
+        for (const recordSet of sets) {
+          html += `
+            <button class="quick-action-btn" data-member='${memberJson}' data-type="${recordSet.type}">
+              ${this._escapeHtml(recordSet.name || recordSet.type)}
+            </button>
+          `;
         }
 
         html += '</div></div>';
       } else {
-        html += `<div class="empty">${this.recordSubTab === 'activity' ? this._t('noActivityTypes') : this._t('noGrowthTypes')}</div>`;
+        html += `<div class="empty">${this._t('noRecordTypes')}</div>`;
       }
     } else if (this.members.length === 0) {
       html += `<div class="empty">${this._t('noMembers')}</div>`;
     }
 
-    // Records timeline section
-    const filteredRecords = this._getFilteredRecords(this.recordSubTab);
+    // Records timeline section (unified, no sub-tabs)
+    const filteredRecords = this._getFilteredRecords();
     html += `<div class="timeline-section"><h2>${this._t('record')}</h2>`;
     if (filteredRecords.length === 0) {
       html += `<div class="empty">${this._t('noRecords')}</div>`;
@@ -1838,8 +1689,8 @@ class HaHealthRecordPanel extends HTMLElement {
               <div class="timeline-content">
                 <div class="timeline-member">${this._escapeHtml(record.member_name)}</div>
                 <div class="timeline-activity">
-                  ${this._escapeHtml(record.activity_name || record.growth_name || record.activity_type || record.growth_type)}:
-                  ${record.amount != null ? record.amount : ''}${record.value != null ? record.value : ''}
+                  ${this._escapeHtml(record.record_name || record.record_type)}:
+                  ${record.value != null ? record.value : ''}
                   ${record.unit ? this._escapeHtml(record.unit) : ''}
                   ${record.note ? ` - "${this._escapeHtml(record.note)}"` : ''}
                 </div>
@@ -1858,8 +1709,8 @@ class HaHealthRecordPanel extends HTMLElement {
                 </div>
               </div>
               <div class="edit-field">
-                <label>${this._t('amount')}${record.unit ? ` (${record.unit})` : ''}</label>
-                <input type="number" id="edit-amount" value="${this.editingRecord.amount}" step="0.1">
+                <label>${this._t('value')}${record.unit ? ` (${record.unit})` : ''}</label>
+                <input type="number" id="edit-value" value="${this.editingRecord.value}" step="0.1">
               </div>
               <div class="edit-field">
                 <label>${this._t('note')}</label>
@@ -1889,12 +1740,11 @@ class HaHealthRecordPanel extends HTMLElement {
   _renderSettingsTab() {
     let html = '';
 
-    // Settings sub-tabs: Members | Activity Types | Growth Types
+    // Settings sub-tabs: Members | Record Types
     html += `
       <div class="sub-tabs">
         <button class="sub-tab ${this.settingsSubTab === 'members' ? 'active' : ''}" data-settings-subtab="members">${this._t('members')}</button>
-        <button class="sub-tab ${this.settingsSubTab === 'activityTypes' ? 'active' : ''}" data-settings-subtab="activityTypes">${this._t('activityTypes')}</button>
-        <button class="sub-tab ${this.settingsSubTab === 'growthTypes' ? 'active' : ''}" data-settings-subtab="growthTypes">${this._t('growthTypes')}</button>
+        <button class="sub-tab ${this.settingsSubTab === 'recordTypes' ? 'active' : ''}" data-settings-subtab="recordTypes">${this._t('recordTypes')}</button>
       </div>
     `;
 
@@ -1902,17 +1752,15 @@ class HaHealthRecordPanel extends HTMLElement {
 
     if (this.settingsSubTab === 'members') {
       html += this._renderMembersManagement();
-    } else if (this.settingsSubTab === 'activityTypes') {
-      html += this._renderActivityTypesManagement();
     } else {
-      html += this._renderGrowthTypesManagement();
+      html += this._renderRecordTypesManagement();
     }
 
     html += '</div>';
     return html;
   }
 
-  _renderActivityTypesManagement() {
+  _renderRecordTypesManagement() {
     let html = '';
 
     const selectedMember = this.members.find(m => m.id === this.selectedMemberId);
@@ -1926,67 +1774,27 @@ class HaHealthRecordPanel extends HTMLElement {
     } else {
       html += `<div class="member-label">${this._t('member')}: ${this._escapeHtml(selectedMember.name)}</div>`;
 
-      const activitySets = selectedMember.activity_sets || [];
-      if (activitySets.length === 0) {
-        html += `<div class="empty" style="padding: 16px;">${this._t('noActivityTypes')}</div>`;
+      const recordSets = selectedMember.record_sets || [];
+      if (recordSets.length === 0) {
+        html += `<div class="empty" style="padding: 16px;">${this._t('noRecordTypes')}</div>`;
       } else {
-        for (const activity of activitySets) {
-          const typeJson = JSON.stringify(activity).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+        for (const recordSet of recordSets) {
+          const typeJson = JSON.stringify(recordSet).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
           html += `
             <div class="type-card">
               <div class="type-info">
-                <div class="type-name">${this._escapeHtml(activity.name)}</div>
-                <div class="type-details">${this._t('unit')}: ${this._escapeHtml(activity.unit)} | ${this._t('current')}: ${activity.current_amount || 0}</div>
+                <div class="type-name">${this._escapeHtml(recordSet.name)}</div>
+                <div class="type-details">${this._t('unit')}: ${this._escapeHtml(recordSet.unit)} | ${this._t('current')}: ${recordSet.current_value || 0}</div>
               </div>
               <div class="type-actions">
-                <button class="btn-icon edit-type-btn" data-category="activity" data-member="${selectedMember.id}" data-type='${typeJson}'>✏️</button>
-                <button class="btn-icon danger delete-type-btn" data-category="activity" data-member="${selectedMember.id}" data-type='${typeJson}'>🗑</button>
+                <button class="btn-icon edit-type-btn" data-member="${selectedMember.id}" data-type='${typeJson}'>✏️</button>
+                <button class="btn-icon danger delete-type-btn" data-member="${selectedMember.id}" data-type='${typeJson}'>🗑</button>
               </div>
             </div>
           `;
         }
       }
-      html += `<button class="add-button" data-category="activity">${this._t('addActivityType')}</button>`;
-    }
-
-    return html;
-  }
-
-  _renderGrowthTypesManagement() {
-    let html = '';
-
-    const selectedMember = this.members.find(m => m.id === this.selectedMemberId);
-
-    if (!selectedMember) {
-      if (this.members.length === 0) {
-        html += `<div class="empty">${this._t('noMembersManage')}</div>`;
-      } else {
-        html += `<div class="empty">${this._t('selectMember')}</div>`;
-      }
-    } else {
-      html += `<div class="member-label">${this._t('member')}: ${this._escapeHtml(selectedMember.name)}</div>`;
-
-      const growthSets = selectedMember.growth_sets || [];
-      if (growthSets.length === 0) {
-        html += `<div class="empty" style="padding: 16px;">${this._t('noGrowthTypes')}</div>`;
-      } else {
-        for (const growth of growthSets) {
-          const typeJson = JSON.stringify(growth).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
-          html += `
-            <div class="type-card">
-              <div class="type-info">
-                <div class="type-name">${this._escapeHtml(growth.name)}</div>
-                <div class="type-details">${this._t('unit')}: ${this._escapeHtml(growth.unit)} | ${this._t('current')}: ${growth.current_value || 0}</div>
-              </div>
-              <div class="type-actions">
-                <button class="btn-icon edit-type-btn" data-category="growth" data-member="${selectedMember.id}" data-type='${typeJson}'>✏️</button>
-                <button class="btn-icon danger delete-type-btn" data-category="growth" data-member="${selectedMember.id}" data-type='${typeJson}'>🗑</button>
-              </div>
-            </div>
-          `;
-        }
-      }
-      html += `<button class="add-button" data-category="growth">${this._t('addGrowthType')}</button>`;
+      html += `<button class="add-button" id="add-record-type-btn">${this._t('addRecordType')}</button>`;
     }
 
     return html;
@@ -2005,7 +1813,7 @@ class HaHealthRecordPanel extends HTMLElement {
           <div class="type-info">
             <div class="type-name">${this._escapeHtml(member.name)}</div>
             <div class="type-details">
-              ID: ${this._escapeHtml(member.id)} | ${this._t('activities')}: ${(member.activity_sets || []).length} | ${this._t('growth')}: ${(member.growth_sets || []).length}
+              ID: ${this._escapeHtml(member.id)} | ${this._t('recordTypes')}: ${(member.record_sets || []).length}
               ${member.note ? `<br>${this._t('note')}: ${this._escapeHtml(member.note)}` : ''}
             </div>
           </div>
@@ -2023,9 +1831,9 @@ class HaHealthRecordPanel extends HTMLElement {
   _renderDialogs() {
     let html = '';
 
-    // Input Dialog (Quick Log)
+    // Input Dialog (Quick Log - unified for all record types)
     if (this.showInputDialog && this.selectedMember) {
-      const typeInfo = this.selectedMember.activity_sets?.find(s => s.type === this.selectedType);
+      const typeInfo = (this.selectedMember.record_sets || []).find(s => s.type === this.selectedType);
       const dialogTitle = this._t('logFor', { type: this._escapeHtml(typeInfo?.name || this.selectedType), name: this._escapeHtml(this.selectedMember.name) });
       html += `
         <div class="dialog-overlay" id="input-dialog-overlay">
@@ -2039,8 +1847,8 @@ class HaHealthRecordPanel extends HTMLElement {
               </div>
             </div>
             <div class="dialog-field">
-              <label>${this._t('amount')}${typeInfo?.unit ? ` (${typeInfo.unit})` : ''}</label>
-              <input type="number" id="input-amount" value="${this.inputAmount}" step="0.1">
+              <label>${this._t('value')}${typeInfo?.unit ? ` (${typeInfo.unit})` : ''}</label>
+              <input type="number" id="input-value" value="${this.inputValue}" step="0.1">
             </div>
             <div class="dialog-field">
               <label>${this._t('note')}</label>
@@ -2057,50 +1865,10 @@ class HaHealthRecordPanel extends HTMLElement {
       `;
     }
 
-    // Growth Dialog (Quick Log Growth)
-    if (this.showGrowthDialog && this.selectedMember) {
-      const typeInfo = this.selectedMember.growth_sets?.find(s => s.type === this.selectedGrowthType);
-      const dialogTitle = this._t('recordGrowthFor', { type: this._escapeHtml(typeInfo?.name || this.selectedGrowthType), name: this._escapeHtml(this.selectedMember.name) });
-      html += `
-        <div class="dialog-overlay" id="growth-dialog-overlay">
-          <div class="dialog">
-            <h3>${dialogTitle}</h3>
-            <div class="dialog-field">
-              <label>${this._t('timestamp')}</label>
-              <div class="timestamp-row">
-                <input type="datetime-local" id="growth-timestamp" value="${this.growthTimestamp}">
-                <button class="btn btn-secondary btn-small" id="growth-now-btn">${this._t('now')}</button>
-              </div>
-            </div>
-            <div class="dialog-field">
-              <label>${this._t('value')}${typeInfo?.unit ? ` (${typeInfo.unit})` : ''}</label>
-              <input type="number" id="growth-value" value="${this.growthInputValue}" step="0.1">
-            </div>
-            <div class="dialog-field">
-              <label>${this._t('note')}</label>
-              <input type="text" id="growth-note" placeholder="${this._t('optionalNote')}" value="${this._escapeHtml(this.growthInputNote)}">
-            </div>
-            <div class="dialog-actions">
-              <button class="btn btn-secondary" id="cancel-growth-btn">${this._t('cancel')}</button>
-              <button class="btn btn-primary" id="save-growth-btn" ${this.submitting ? 'disabled' : ''}>
-                ${this.submitting ? this._t('saving') : this._t('save')}
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    // Type Dialog (Add/Edit Activity or Growth Type)
+    // Type Dialog (Add/Edit Record Type - unified)
     if (this.showTypeDialog && this.editingType) {
       const isAdd = this.editingType.mode === 'add';
-      const category = this.editingType.category;
-      let dialogTitle;
-      if (category === 'activity') {
-        dialogTitle = isAdd ? this._t('addActivityTypeTitle') : this._t('editActivityTypeTitle');
-      } else {
-        dialogTitle = isAdd ? this._t('addGrowthTypeTitle') : this._t('editGrowthTypeTitle');
-      }
+      const dialogTitle = isAdd ? this._t('addRecordTypeTitle') : this._t('editRecordTypeTitle');
 
       html += `
         <div class="dialog-overlay" id="type-dialog-overlay">
@@ -2123,8 +1891,8 @@ class HaHealthRecordPanel extends HTMLElement {
               <input type="text" id="type-unit" value="${this._escapeHtml(this.editingType.data.unit)}" placeholder="${this._t('unitPlaceholder')}">
             </div>
             <div class="dialog-field">
-              <label>${category === 'activity' ? this._t('defaultAmount') : this._t('defaultValue')}</label>
-              <input type="number" id="type-default" value="${this.editingType.data.default_amount}" step="0.1">
+              <label>${this._t('defaultValue')}</label>
+              <input type="number" id="type-default" value="${this.editingType.data.default_value}" step="0.1">
             </div>
             <div class="dialog-actions">
               <button class="btn btn-secondary" id="cancel-type-btn">${this._t('cancel')}</button>
@@ -2206,11 +1974,6 @@ class HaHealthRecordPanel extends HTMLElement {
       tab.addEventListener('click', () => this._switchTab(tab.dataset.tab));
     });
 
-    // Record sub-tab navigation
-    this.shadowRoot.querySelectorAll('.sub-tab[data-subtab]').forEach(tab => {
-      tab.addEventListener('click', () => this._switchRecordSubTab(tab.dataset.subtab));
-    });
-
     // Settings sub-tab navigation
     this.shadowRoot.querySelectorAll('.sub-tab[data-settings-subtab]').forEach(tab => {
       tab.addEventListener('click', () => this._switchSettingsSubTab(tab.dataset.settingsSubtab));
@@ -2245,8 +2008,8 @@ class HaHealthRecordPanel extends HTMLElement {
       addMemberChip.addEventListener('click', () => this._openAddMemberDialog());
     }
 
-    // Quick action buttons (activity)
-    this.shadowRoot.querySelectorAll('.quick-action-btn:not(.growth-btn)').forEach(btn => {
+    // Quick action buttons (unified - all record types)
+    this.shadowRoot.querySelectorAll('.quick-action-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const memberData = btn.getAttribute('data-member');
@@ -2254,19 +2017,6 @@ class HaHealthRecordPanel extends HTMLElement {
         if (memberData && type) {
           const member = JSON.parse(memberData.replace(/&quot;/g, '"'));
           this._openInputDialog(member, type);
-        }
-      });
-    });
-
-    // Quick action buttons (growth)
-    this.shadowRoot.querySelectorAll('.quick-action-btn.growth-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const memberData = btn.getAttribute('data-member');
-        const growthType = btn.getAttribute('data-growth-type');
-        if (memberData && growthType) {
-          const member = JSON.parse(memberData.replace(/&quot;/g, '"'));
-          this._openGrowthDialog(member, growthType);
         }
       });
     });
@@ -2304,10 +2054,10 @@ class HaHealthRecordPanel extends HTMLElement {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const timestampInput = this.shadowRoot.querySelector('#edit-timestamp');
-        const amountInput = this.shadowRoot.querySelector('#edit-amount');
+        const valueInput = this.shadowRoot.querySelector('#edit-value');
         const noteInput = this.shadowRoot.querySelector('#edit-note');
         if (timestampInput) this.editingRecord.timestamp = timestampInput.value;
-        if (amountInput) this.editingRecord.amount = parseFloat(amountInput.value) || 0;
+        if (valueInput) this.editingRecord.value = parseFloat(valueInput.value) || 0;
         if (noteInput) this.editingRecord.note = noteInput.value;
 
         const recordData = btn.getAttribute('data-record');
@@ -2349,29 +2099,28 @@ class HaHealthRecordPanel extends HTMLElement {
     // Type management - Edit buttons
     this.shadowRoot.querySelectorAll('.edit-type-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const category = btn.dataset.category;
         const memberId = btn.dataset.member;
         const typeData = JSON.parse(btn.dataset.type.replace(/&quot;/g, '"'));
-        this._openEditTypeDialog(category, memberId, typeData);
+        this._openEditTypeDialog(memberId, typeData);
       });
     });
 
     // Type management - Delete buttons
     this.shadowRoot.querySelectorAll('.delete-type-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const category = btn.dataset.category;
         const memberId = btn.dataset.member;
         const typeData = JSON.parse(btn.dataset.type.replace(/&quot;/g, '"'));
-        this._showDeleteTypeConfirm(category, memberId, typeData);
+        this._showDeleteTypeConfirm(memberId, typeData);
       });
     });
 
     // Type management - Add button
-    this.shadowRoot.querySelectorAll('.add-button[data-category]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this._openAddTypeDialog(btn.dataset.category);
+    const addRecordTypeBtn = this.shadowRoot.querySelector('#add-record-type-btn');
+    if (addRecordTypeBtn) {
+      addRecordTypeBtn.addEventListener('click', () => {
+        this._openAddTypeDialog();
       });
-    });
+    }
 
     // Member management - Edit buttons
     this.shadowRoot.querySelectorAll('.edit-member-btn').forEach(btn => {
@@ -2399,10 +2148,10 @@ class HaHealthRecordPanel extends HTMLElement {
     if (saveInputBtn) {
       saveInputBtn.addEventListener('click', () => {
         const timestampInput = this.shadowRoot.querySelector('#input-timestamp');
-        const amountInput = this.shadowRoot.querySelector('#input-amount');
+        const valueInput = this.shadowRoot.querySelector('#input-value');
         const noteInput = this.shadowRoot.querySelector('#input-note');
         if (timestampInput) this.inputTimestamp = timestampInput.value;
-        if (amountInput) this.inputAmount = parseFloat(amountInput.value) || 0;
+        if (valueInput) this.inputValue = parseFloat(valueInput.value) || 0;
         if (noteInput) this.inputNote = noteInput.value;
         this._submitInput();
       });
@@ -2424,41 +2173,6 @@ class HaHealthRecordPanel extends HTMLElement {
       });
     }
 
-    // Growth Dialog buttons
-    const cancelGrowthBtn = this.shadowRoot.querySelector('#cancel-growth-btn');
-    if (cancelGrowthBtn) {
-      cancelGrowthBtn.addEventListener('click', () => this._closeGrowthDialog());
-    }
-
-    const saveGrowthBtn = this.shadowRoot.querySelector('#save-growth-btn');
-    if (saveGrowthBtn) {
-      saveGrowthBtn.addEventListener('click', () => {
-        const timestampInput = this.shadowRoot.querySelector('#growth-timestamp');
-        const valueInput = this.shadowRoot.querySelector('#growth-value');
-        const noteInput = this.shadowRoot.querySelector('#growth-note');
-        if (timestampInput) this.growthTimestamp = timestampInput.value;
-        if (valueInput) this.growthInputValue = parseFloat(valueInput.value) || 0;
-        if (noteInput) this.growthInputNote = noteInput.value;
-        this._submitGrowth();
-      });
-    }
-
-    const growthNowBtn = this.shadowRoot.querySelector('#growth-now-btn');
-    if (growthNowBtn) {
-      growthNowBtn.addEventListener('click', () => {
-        this.growthTimestamp = this._toLocalISOString(new Date());
-        const timestampInput = this.shadowRoot.querySelector('#growth-timestamp');
-        if (timestampInput) timestampInput.value = this.growthTimestamp;
-      });
-    }
-
-    const growthDialogOverlay = this.shadowRoot.querySelector('#growth-dialog-overlay');
-    if (growthDialogOverlay) {
-      growthDialogOverlay.addEventListener('click', (e) => {
-        if (e.target === growthDialogOverlay) this._closeGrowthDialog();
-      });
-    }
-
     // Type Dialog buttons
     const cancelTypeBtn = this.shadowRoot.querySelector('#cancel-type-btn');
     if (cancelTypeBtn) {
@@ -2476,7 +2190,7 @@ class HaHealthRecordPanel extends HTMLElement {
         if (memberSelect) this.editingType.memberId = memberSelect.value;
         if (nameInput) this.editingType.data.name = nameInput.value;
         if (unitInput) this.editingType.data.unit = unitInput.value;
-        if (defaultInput) this.editingType.data.default_amount = parseFloat(defaultInput.value) || 0;
+        if (defaultInput) this.editingType.data.default_value = parseFloat(defaultInput.value) || 0;
 
         this._saveType();
       });
