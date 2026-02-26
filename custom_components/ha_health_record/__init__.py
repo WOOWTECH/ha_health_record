@@ -69,7 +69,6 @@ async def async_migrate_entry(
             options={CONF_RECORD_SETS: record_sets},
             version=2,
         )
-        config_entry.version = 2
         _LOGGER.info(
             "Migration complete for %s: %d record sets",
             config_entry.title,

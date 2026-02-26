@@ -5,7 +5,7 @@ DOMAIN: Final = "ha_health_record"
 
 # Storage
 STORAGE_KEY: Final = DOMAIN
-STORAGE_VERSION: Final = 2
+STORAGE_VERSION: Final = 1
 
 # Config keys
 CONF_MEMBER_NAME = "member_name"
