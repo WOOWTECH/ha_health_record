@@ -407,6 +407,14 @@ class HaHealthRecordPanel extends HTMLElement {
     });
   }
 
+  _formatDateTime(dateStr) {
+    const date = new Date(dateStr);
+    const locale = this._getLocale();
+    const datePart = date.toLocaleDateString(locale, { month: '2-digit', day: '2-digit' });
+    const timePart = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    return `${datePart} ${timePart}`;
+  }
+
   _generateRecordId(record) {
     // Use UUID if available, otherwise fall back to composite key
     if (record.id) return record.id;
@@ -1517,20 +1525,41 @@ class HaHealthRecordPanel extends HTMLElement {
         align-items: flex-start;
       }
       .timeline-time {
-        min-width: 60px;
+        min-width: 90px;
         color: var(--secondary-text-color, #757575);
-        font-size: 14px;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: nowrap;
       }
       .timeline-content {
         flex: 1;
       }
-      .timeline-member {
+      .timeline-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .timeline-type-tag {
+        display: inline-block;
+        background: var(--primary-color, #03a9f4);
+        color: #fff;
+        font-size: 11px;
         font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 12px;
+        line-height: 1.4;
+      }
+      .timeline-value {
+        font-size: 16px;
+        font-weight: 600;
         color: var(--primary-text-color, #212121);
       }
-      .timeline-activity {
+      .timeline-note {
         color: var(--secondary-text-color, #757575);
-        font-size: 14px;
+        font-size: 13px;
+        font-style: italic;
+        margin-top: 4px;
       }
 
       /* Expanded edit form */
@@ -2059,15 +2088,13 @@ class HaHealthRecordPanel extends HTMLElement {
         html += `
           <div class="timeline-item ${isExpanded ? 'expanded' : ''}" data-record='${recordJson}'>
             <div class="timeline-row">
-              <div class="timeline-time">${this._formatTime(record.timestamp)}</div>
+              <div class="timeline-time">${this._formatDateTime(record.timestamp)}</div>
               <div class="timeline-content">
-                <div class="timeline-member">${this._escapeHtml(record.member_name)}</div>
-                <div class="timeline-activity">
-                  ${this._escapeHtml(record.record_name || record.record_type)}:
-                  ${record.value != null ? record.value : ''}
-                  ${record.unit ? this._escapeHtml(record.unit) : ''}
-                  ${record.note ? ` - "${this._escapeHtml(record.note)}"` : ''}
+                <div class="timeline-header">
+                  <span class="timeline-type-tag">${this._escapeHtml(record.record_name || record.record_type)}</span>
+                  <span class="timeline-value">${record.value != null ? record.value : ''} ${record.unit ? this._escapeHtml(record.unit) : ''}</span>
                 </div>
+                ${record.note ? `<div class="timeline-note">"${this._escapeHtml(record.note)}"</div>` : ''}
               </div>
             </div>
         `;
