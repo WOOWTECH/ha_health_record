@@ -384,13 +384,15 @@ class HealthRecordCoordinator:
             try:
                 record_time = dt_util.parse_datetime(record["timestamp"])
                 if record_time and start_time <= record_time <= end_time:
+                    type_id = record["record_type"]
+                    rs = self.record_sets.get(type_id)
                     entry = {
                         "member_id": self.member_id,
                         "member_name": self.member_name,
-                        "record_type": record["record_type"],
-                        "record_name": record["record_name"],
+                        "record_type": type_id,
+                        "record_name": rs.name if rs else record.get("record_name", type_id),
                         "value": record["value"],
-                        "unit": record["unit"],
+                        "unit": rs.unit if rs else record.get("unit", ""),
                         "note": record.get("note", ""),
                         "timestamp": record["timestamp"],
                     }
