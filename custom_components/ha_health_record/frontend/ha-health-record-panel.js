@@ -42,8 +42,8 @@ class HaHealthRecordPanel extends HTMLElement {
     this.inputDialogMode = '';
 
     // Settings section collapse state
-    this.settingsMemberCollapsed = false;
-    this.settingsTypesCollapsed = false;
+    this.settingsMemberCollapsed = true;
+    this.settingsTypesCollapsed = true;
 
     // Calendar filter state
     this._filterDateStart = '';   // ISO date string YYYY-MM-DD
