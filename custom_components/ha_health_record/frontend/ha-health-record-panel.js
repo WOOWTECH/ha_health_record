@@ -273,15 +273,9 @@ class HaHealthRecordPanel extends HTMLElement {
       },
     };
 
-    // Initialize dates (date-only format YYYY-MM-DD for calendar picker)
-    const now = new Date();
-    const pad = (n) => n.toString().padStart(2, '0');
-    const todayISO = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    this._filterDateStart = todayISO;
-    this._filterDateEnd = todayISO;
-    // Derive full datetime for API calls
-    this.startDate = this._toLocalISOString(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0));
-    this.endDate = this._toLocalISOString(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999));
+    // Wide fallback range so initial load fetches all records
+    this.startDate = '2000-01-01T00:00:00';
+    this.endDate = '2099-12-31T23:59:59';
   }
 
   // Get localized string
@@ -476,13 +470,13 @@ class HaHealthRecordPanel extends HTMLElement {
   }
 
   _handleDateChange() {
-    // Derive full datetime range from date-only _filterDateStart / _filterDateEnd
-    if (this._filterDateStart) {
-      this.startDate = this._toLocalISOString(new Date(this._filterDateStart + 'T00:00:00'));
-    }
-    if (this._filterDateEnd) {
-      this.endDate = this._toLocalISOString(new Date(this._filterDateEnd + 'T23:59:59'));
-    }
+    // Derive full datetime range; use wide fallback when filter is cleared
+    this.startDate = this._filterDateStart
+      ? this._toLocalISOString(new Date(this._filterDateStart + 'T00:00:00'))
+      : '2000-01-01T00:00:00';
+    this.endDate = this._filterDateEnd
+      ? this._toLocalISOString(new Date(this._filterDateEnd + 'T23:59:59'))
+      : '2099-12-31T23:59:59';
     this._loadRecords();
   }
 
@@ -1141,17 +1135,12 @@ class HaHealthRecordPanel extends HTMLElement {
         color: var(--secondary-text-color);
       }
       .date-picker-clear {
-        position: absolute;
-        top: 50%;
-        right: -20px;
-        transform: translateY(-50%);
-        border: none;
-        background: transparent;
         color: var(--secondary-text-color);
         cursor: pointer;
         font-size: 16px;
-        padding: 2px 4px;
+        padding: 0 2px;
         line-height: 1;
+        flex-shrink: 0;
       }
       .date-picker-clear:hover {
         color: var(--error-color, #f44336);
@@ -1998,10 +1987,9 @@ class HaHealthRecordPanel extends HTMLElement {
               <span class="${!this._filterDateStart ? 'placeholder' : ''}">
                 ${this._filterDateStart ? this._formatDateForInput(this._filterDateStart) : this._t('start_date')}
               </span>
-              ${calendarSvg}
+              ${this._filterDateStart ? '<span class="date-picker-clear" data-clear-date="start">&times;</span>' : calendarSvg}
             </button>
             ${this._filterCalendarOpen === 'start' ? this._renderFilterCalendar('start') : ''}
-            ${this._filterDateStart ? '<button type="button" class="date-picker-clear" data-clear-date="start">&times;</button>' : ''}
           </div>
           <span class="date-separator">-</span>
           <div class="date-picker-wrapper" data-picker="end">
@@ -2009,10 +1997,9 @@ class HaHealthRecordPanel extends HTMLElement {
               <span class="${!this._filterDateEnd ? 'placeholder' : ''}">
                 ${this._filterDateEnd ? this._formatDateForInput(this._filterDateEnd) : this._t('end_date')}
               </span>
-              ${calendarSvg}
+              ${this._filterDateEnd ? '<span class="date-picker-clear" data-clear-date="end">&times;</span>' : calendarSvg}
             </button>
             ${this._filterCalendarOpen === 'end' ? this._renderFilterCalendar('end') : ''}
-            ${this._filterDateEnd ? '<button type="button" class="date-picker-clear" data-clear-date="end">&times;</button>' : ''}
           </div>
         </div>
         <div class="search-row-input-wrapper">
