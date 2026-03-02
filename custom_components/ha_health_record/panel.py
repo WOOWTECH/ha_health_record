@@ -14,6 +14,7 @@ from homeassistant.components import websocket_api, frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CONF_RECORD_NAME,
@@ -536,6 +537,20 @@ async def ws_delete_record_type(
     if len(new_sets) == len(record_sets):
         connection.send_error(msg["id"], "type_not_found", f"Record type {type_id} not found")
         return
+
+    # Remove entities for the deleted record type from the entity registry
+    entity_reg = er.async_get(hass)
+    suffixes = [
+        ("sensor", "_record"),
+        ("button", "_log"),
+        ("number", "_value"),
+        ("text", "_note"),
+    ]
+    for platform, suffix in suffixes:
+        unique_id = f"{member_id}_{type_id}{suffix}"
+        entity_id = entity_reg.async_get_entity_id(platform, DOMAIN, unique_id)
+        if entity_id:
+            entity_reg.async_remove(entity_id)
 
     current_options[CONF_RECORD_SETS] = new_sets
 
