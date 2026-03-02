@@ -52,7 +52,9 @@ class HaHealthRecordConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            member_id = user_input[CONF_MEMBER_ID]
+            member_id = user_input.get(CONF_MEMBER_ID, "").strip()
+            if not member_id:
+                member_id = user_input[CONF_MEMBER_NAME]
 
             # Validate member_id produces a usable sanitized ID
             sanitized_id = _sanitize_id(member_id)
@@ -79,7 +81,7 @@ class HaHealthRecordConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_MEMBER_NAME): str,
-                    vol.Required(CONF_MEMBER_ID): str,
+                    vol.Optional(CONF_MEMBER_ID, default=""): str,
                 }
             ),
             errors=errors,

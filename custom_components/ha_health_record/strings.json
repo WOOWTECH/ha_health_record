@@ -29,7 +29,7 @@
         "description": "Add a new family member to track health records.",
         "data": {
           "member_name": "Name",
-          "member_id": "ID (unique identifier)"
+          "member_id": "ID (optional, auto-generated if blank)"
         }
       }
     },

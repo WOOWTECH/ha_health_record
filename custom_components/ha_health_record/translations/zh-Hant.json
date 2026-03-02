@@ -28,7 +28,7 @@
         "description": "新增一位家庭成員來追蹤健康紀錄。",
         "data": {
           "member_name": "名稱",
-          "member_id": "ID（唯一識別碼）"
+          "member_id": "ID（選填，留空自動產生）"
         }
       }
     },
