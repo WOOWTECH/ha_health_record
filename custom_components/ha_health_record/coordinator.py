@@ -299,6 +299,29 @@ class HealthRecordCoordinator:
             model="Family Member",
         )
 
+    # ── Helpers ──────────────────────────────────────────────────────
+
+    def _recalculate_current_value(self, type_id: str) -> None:
+        """Recalculate current_value for a record set from the latest record."""
+        if type_id not in self.record_sets:
+            return
+
+        # Find all records for this type, pick the most recent by timestamp
+        latest_value: float | None = None
+        latest_ts: datetime | None = None
+        for record in self.records:
+            if record.get("record_type") != type_id:
+                continue
+            try:
+                record_time = dt_util.parse_datetime(record["timestamp"])
+            except (ValueError, TypeError):
+                continue
+            if record_time is not None and (latest_ts is None or record_time > latest_ts):
+                latest_ts = record_time
+                latest_value = record.get("value")
+
+        self.record_sets[type_id].current_value = latest_value
+
     # ── Unified CRUD methods ────────────────────────────────────────
 
     def set_record_value(self, type_id: str, value: float | None) -> None:
@@ -390,10 +413,12 @@ class HealthRecordCoordinator:
             # Match by UUID first (preferred), fall back to type+timestamp
             if record_id and record.get("id") == record_id:
                 del self.records[i]
+                self._recalculate_current_value(type_id)
                 self._async_schedule_save()
                 return True
             if not record_id and record["record_type"] == type_id and record["timestamp"] == timestamp:
                 del self.records[i]
+                self._recalculate_current_value(type_id)
                 self._async_schedule_save()
                 return True
         return False
@@ -422,6 +447,7 @@ class HealthRecordCoordinator:
                     record["note"] = note
                 if new_timestamp is not None:
                     record["timestamp"] = new_timestamp
+                self._recalculate_current_value(type_id)
                 self._async_schedule_save()
                 return True
         return False

@@ -126,6 +126,7 @@ class HaHealthRecordPanel extends HTMLElement {
         lastRecord: 'Last Record',
         noRecordsYet: 'No records yet',
         recordTypesCount: 'Record Types',
+        latestValues: 'Latest Values',
         // Calendar
         start_date: 'Start Date',
         end_date: 'End Date',
@@ -206,6 +207,7 @@ class HaHealthRecordPanel extends HTMLElement {
         lastRecord: '最新紀錄',
         noRecordsYet: '尚無紀錄',
         recordTypesCount: '紀錄類型',
+        latestValues: '最新數值',
         // Calendar
         start_date: '開始日期',
         end_date: '結束日期',
@@ -286,6 +288,7 @@ class HaHealthRecordPanel extends HTMLElement {
         lastRecord: '最新记录',
         noRecordsYet: '尚无记录',
         recordTypesCount: '记录类型',
+        latestValues: '最新数值',
         // Calendar
         start_date: '开始日期',
         end_date: '结束日期',
@@ -486,7 +489,7 @@ class HaHealthRecordPanel extends HTMLElement {
       });
 
       this._closeInputDialog();
-      await this._loadRecords();
+      await this._loadData();
     } catch (error) {
       console.error('Error logging record:', error);
       alert('Failed to log record: ' + error.message);
@@ -722,7 +725,7 @@ class HaHealthRecordPanel extends HTMLElement {
 
       this.expandedRecordId = null;
       this.editingRecord = null;
-      await this._loadRecords();
+      await this._loadData();
     } catch (error) {
       console.error('Error updating record:', error);
       alert('Failed to update record: ' + error.message);
@@ -1397,6 +1400,46 @@ class HaHealthRecordPanel extends HTMLElement {
         font-size: 12px;
         color: var(--secondary-text-color);
       }
+      .overview-latest-section {
+        border-top: 1px solid var(--divider-color, #e0e0e0);
+        margin-top: 12px;
+        padding-top: 10px;
+      }
+      .overview-latest-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--secondary-text-color);
+        margin-bottom: 8px;
+      }
+      .overview-latest-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+      }
+      .overview-latest-item {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 4px;
+      }
+      .overview-latest-name {
+        font-size: 13px;
+        color: var(--secondary-text-color);
+      }
+      .overview-latest-value {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--primary-text-color);
+      }
+      .overview-latest-unit {
+        font-size: 12px;
+        color: var(--secondary-text-color);
+      }
+      .overview-latest-none {
+        font-size: 14px;
+        color: var(--disabled-text-color, #bdbdbd);
+      }
 
       /* Tab Navigation */
       .tabs {
@@ -1909,6 +1952,18 @@ class HaHealthRecordPanel extends HTMLElement {
         .overview-card-stat-primary {
           font-size: 28px;
         }
+        .overview-latest-grid {
+          gap: 4px 12px;
+        }
+        .overview-latest-name {
+          font-size: 12px;
+        }
+        .overview-latest-value {
+          font-size: 13px;
+        }
+        .overview-latest-unit {
+          font-size: 11px;
+        }
       }
     `;
 
@@ -2000,6 +2055,25 @@ class HaHealthRecordPanel extends HTMLElement {
 
     const typeCount = (member.record_sets || []).length;
 
+    // Build latest values section
+    let latestValuesHtml = '';
+    const recordSets = member.record_sets || [];
+    if (recordSets.length > 0) {
+      const items = recordSets.map(rs => {
+        const name = this._escapeHtml(rs.name || rs.type || '');
+        const hasValue = rs.current_value !== null && rs.current_value !== undefined;
+        const valueHtml = hasValue
+          ? `<span class="overview-latest-value">${this._escapeHtml(String(rs.current_value))}</span>${rs.unit ? ` <span class="overview-latest-unit">${this._escapeHtml(rs.unit)}</span>` : ''}`
+          : '<span class="overview-latest-none">--</span>';
+        return `<div class="overview-latest-item"><span class="overview-latest-name">${name}:</span> ${valueHtml}</div>`;
+      }).join('');
+      latestValuesHtml = `
+        <div class="overview-latest-section">
+          <div class="overview-latest-title">${this._t('latestValues')}</div>
+          <div class="overview-latest-grid">${items}</div>
+        </div>`;
+    }
+
     return `
       <div class="overview-card">
         <div class="overview-card-stat-label">${this._t('totalRecords')}</div>
@@ -2011,6 +2085,7 @@ class HaHealthRecordPanel extends HTMLElement {
             <div class="overview-stat-label">${this._t('recordTypesCount')}</div>
           </div>
         </div>
+        ${latestValuesHtml}
       </div>
     `;
   }
