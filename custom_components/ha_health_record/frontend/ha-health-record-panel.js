@@ -37,6 +37,11 @@ class HaHealthRecordPanel extends HTMLElement {
     // New: Search query
     this.searchQuery = '';
 
+    // Type filter toggles (empty = show all; non-empty = show only matching types)
+    this.activeTypeFilters = [];
+    // Input dialog mode: '' | 'quick' | 'add'
+    this.inputDialogMode = '';
+
     // Calendar filter state
     this._filterDateStart = '';   // ISO date string YYYY-MM-DD
     this._filterDateEnd = '';     // ISO date string YYYY-MM-DD
@@ -73,6 +78,9 @@ class HaHealthRecordPanel extends HTMLElement {
         current: 'Current',
         records_label: 'Records',
         // Buttons
+        addRecord: 'Add Record',
+        recordType: 'Record Type',
+        selectRecordType: 'Select record type',
         addRecordType: '+ Add Record Type',
         addMember: 'Add Member',
         save: 'Save',
@@ -143,6 +151,9 @@ class HaHealthRecordPanel extends HTMLElement {
         current: '目前',
         records_label: '紀錄',
         // Buttons
+        addRecord: '新增紀錄',
+        recordType: '紀錄類型',
+        selectRecordType: '選擇紀錄類型',
         addRecordType: '+ 新增紀錄類型',
         addMember: '+ 新增成員',
         save: '儲存',
@@ -213,6 +224,9 @@ class HaHealthRecordPanel extends HTMLElement {
         current: '当前',
         records_label: '记录',
         // Buttons
+        addRecord: '添加记录',
+        recordType: '记录类型',
+        selectRecordType: '选择记录类型',
         addRecordType: '+ 添加记录类型',
         addMember: '+ 添加成员',
         save: '保存',
@@ -399,7 +413,8 @@ class HaHealthRecordPanel extends HTMLElement {
     return `${record.member_id}_${record.record_type}_${record.timestamp}`;
   }
 
-  _openInputDialog(member, recordType) {
+  _openInputDialog(member, recordType, mode = 'quick') {
+    this.inputDialogMode = mode;
     this.selectedMember = member;
     this.selectedType = recordType;
     const typeInfo = (member.record_sets || []).find(s => s.type === recordType);
@@ -410,10 +425,18 @@ class HaHealthRecordPanel extends HTMLElement {
     this._render();
   }
 
+  _openAddRecordDialog() {
+    const member = this.members.find(m => m.id === this.selectedMemberId);
+    if (!member) return;
+    const firstSet = (member.record_sets || [])[0];
+    this._openInputDialog(member, firstSet ? firstSet.type : '', 'add');
+  }
+
   _closeInputDialog() {
     this.showInputDialog = false;
     this.selectedMember = null;
     this.selectedType = '';
+    this.inputDialogMode = '';
     this._render();
   }
 
@@ -578,6 +601,17 @@ class HaHealthRecordPanel extends HTMLElement {
     }
   }
 
+  // Toggle a record type filter on/off
+  _toggleTypeFilter(type) {
+    const idx = this.activeTypeFilters.indexOf(type);
+    if (idx === -1) {
+      this.activeTypeFilters = [...this.activeTypeFilters, type];
+    } else {
+      this.activeTypeFilters = this.activeTypeFilters.filter(t => t !== type);
+    }
+    this._render();
+  }
+
   // Get filtered records based on member and search
   _getFilteredRecords() {
     let filtered = [...this.records];
@@ -585,6 +619,11 @@ class HaHealthRecordPanel extends HTMLElement {
     // Filter by selected member
     if (this.selectedMemberId) {
       filtered = filtered.filter(r => r.member_id === this.selectedMemberId);
+    }
+
+    // Filter by active type filters
+    if (this.activeTypeFilters.length > 0) {
+      filtered = filtered.filter(r => this.activeTypeFilters.includes(r.record_type));
     }
 
     // Filter by search query
@@ -1420,18 +1459,31 @@ class HaHealthRecordPanel extends HTMLElement {
         gap: 8px;
         margin-top: 12px;
       }
-      .quick-actions button {
-        padding: 6px 12px;
-        background: var(--primary-color, #03a9f4);
-        color: white;
-        border: none;
+      .quick-filter-btn {
+        padding: 6px 14px;
+        background: var(--secondary-background-color, #e0e0e0);
+        color: var(--primary-text-color, #212121);
+        border: 2px solid transparent;
         border-radius: 16px;
         cursor: pointer;
         font-size: 12px;
-        transition: opacity 0.2s;
+        font-weight: 500;
+        transition: background 0.2s, border-color 0.2s, color 0.2s;
       }
-      .quick-actions button:hover {
-        opacity: 0.9;
+      .quick-filter-btn:hover {
+        border-color: var(--primary-color);
+      }
+      .quick-filter-btn.active {
+        background: var(--primary-color, #03a9f4);
+        color: var(--text-primary-color, white);
+        border-color: var(--primary-color, #03a9f4);
+      }
+      .add-record-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: auto;
+        flex-shrink: 0;
       }
       .timeline-section {
         background: var(--card-background-color, white);
@@ -1930,7 +1982,10 @@ class HaHealthRecordPanel extends HTMLElement {
       </div>
     `;
 
-    // Date Range Filter (calendar picker)
+    // Lookup selected member early (needed for Add Record button and filter buttons)
+    const selectedMember = this.members.find(m => m.id === this.selectedMemberId);
+
+    // Date Range Filter (calendar picker) + Add Record button
     const calendarSvg = '<svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M19,19H5V8H19M16,1V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3H18V1M17,12H12V17H17V12Z"/></svg>';
     html += `
       <div class="filter-bar">
@@ -1957,13 +2012,14 @@ class HaHealthRecordPanel extends HTMLElement {
             ${this._filterDateEnd ? '<button type="button" class="date-picker-clear" data-clear-date="end">&times;</button>' : ''}
           </div>
         </div>
+        <button class="btn btn-primary add-record-btn" id="add-record-btn" ${!selectedMember ? 'disabled' : ''}>
+          + ${this._t('addRecord')}
+        </button>
       </div>
     `;
 
-    // Quick action buttons for selected member (all record types as buttons, no category split)
-    const selectedMember = this.members.find(m => m.id === this.selectedMemberId);
+    // Record type filter buttons for selected member
     if (selectedMember) {
-      const memberJson = JSON.stringify(selectedMember).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
       const sets = selectedMember.record_sets || [];
 
       if (sets.length > 0) {
@@ -1973,8 +2029,9 @@ class HaHealthRecordPanel extends HTMLElement {
         `;
 
         for (const recordSet of sets) {
+          const isActive = this.activeTypeFilters.includes(recordSet.type);
           html += `
-            <button class="quick-action-btn" data-member='${memberJson}' data-type="${recordSet.type}">
+            <button class="quick-filter-btn ${isActive ? 'active' : ''}" data-type="${recordSet.type}">
               ${this._escapeHtml(recordSet.name || recordSet.type)}
             </button>
           `;
@@ -2151,11 +2208,30 @@ class HaHealthRecordPanel extends HTMLElement {
     // Input Dialog (Quick Log - unified for all record types)
     if (this.showInputDialog && this.selectedMember) {
       const typeInfo = (this.selectedMember.record_sets || []).find(s => s.type === this.selectedType);
-      const dialogTitle = this._t('logFor', { type: this._escapeHtml(typeInfo?.name || this.selectedType), name: this._escapeHtml(this.selectedMember.name) });
+      const isAddMode = this.inputDialogMode === 'add';
+      const dialogTitle = isAddMode
+        ? this._t('addRecord')
+        : this._t('logFor', { type: this._escapeHtml(typeInfo?.name || this.selectedType), name: this._escapeHtml(this.selectedMember.name) });
+
+      // Build record type dropdown for add mode
+      const allSets = this.selectedMember.record_sets || [];
+      let typeSelectHtml = '';
+      if (isAddMode) {
+        typeSelectHtml = `
+            <div class="dialog-field">
+              <label>${this._t('recordType')}</label>
+              <select id="input-type-select">
+                ${allSets.map(s => `<option value="${s.type}" ${s.type === this.selectedType ? 'selected' : ''}>${this._escapeHtml(s.name || s.type)}</option>`).join('')}
+              </select>
+            </div>
+        `;
+      }
+
       html += `
         <div class="dialog-overlay" id="input-dialog-overlay">
           <div class="dialog">
             <h3>${dialogTitle}</h3>
+            ${typeSelectHtml}
             <div class="dialog-field">
               <label>${this._t('timestamp')}</label>
               <div class="timestamp-row">
@@ -2354,6 +2430,7 @@ class HaHealthRecordPanel extends HTMLElement {
         const memberId = chip.dataset.memberId;
         if (memberId) {
           this.selectedMemberId = memberId;
+          this.activeTypeFilters = [];
           this._render();
         }
       });
@@ -2365,18 +2442,22 @@ class HaHealthRecordPanel extends HTMLElement {
       addMemberChip.addEventListener('click', () => this._openAddMemberDialog());
     }
 
-    // Quick action buttons (unified - all record types)
-    this.shadowRoot.querySelectorAll('.quick-action-btn').forEach(btn => {
+    // Record type filter toggle buttons
+    this.shadowRoot.querySelectorAll('.quick-filter-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const memberData = btn.getAttribute('data-member');
         const type = btn.getAttribute('data-type');
-        if (memberData && type) {
-          const member = JSON.parse(memberData.replace(/&quot;/g, '"'));
-          this._openInputDialog(member, type);
+        if (type) {
+          this._toggleTypeFilter(type);
         }
       });
     });
+
+    // Add Record button
+    const addRecordBtn = this.shadowRoot.querySelector('#add-record-btn');
+    if (addRecordBtn) {
+      addRecordBtn.addEventListener('click', () => this._openAddRecordDialog());
+    }
 
     // Timeline item click (expand/collapse)
     this.shadowRoot.querySelectorAll('.timeline-item').forEach(item => {
@@ -2520,6 +2601,24 @@ class HaHealthRecordPanel extends HTMLElement {
         this.inputTimestamp = this._toLocalISOString(new Date());
         const timestampInput = this.shadowRoot.querySelector('#input-timestamp');
         if (timestampInput) timestampInput.value = this.inputTimestamp;
+      });
+    }
+
+    // Input dialog: record type dropdown change (add mode)
+    const inputTypeSelect = this.shadowRoot.querySelector('#input-type-select');
+    if (inputTypeSelect) {
+      inputTypeSelect.addEventListener('change', () => {
+        // Capture current timestamp and note before re-render
+        const timestampInput = this.shadowRoot.querySelector('#input-timestamp');
+        const noteInput = this.shadowRoot.querySelector('#input-note');
+        if (timestampInput) this.inputTimestamp = timestampInput.value;
+        if (noteInput) this.inputNote = noteInput.value;
+
+        // Switch to the new type and update default value
+        this.selectedType = inputTypeSelect.value;
+        const typeInfo = (this.selectedMember.record_sets || []).find(s => s.type === this.selectedType);
+        this.inputValue = typeInfo?.default_value ?? 0;
+        this._render();
       });
     }
 
