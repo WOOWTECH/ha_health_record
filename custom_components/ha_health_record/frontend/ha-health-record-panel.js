@@ -41,6 +41,10 @@ class HaHealthRecordPanel extends HTMLElement {
     // Input dialog mode: '' | 'quick' | 'add'
     this.inputDialogMode = '';
 
+    // Settings section collapse state
+    this.settingsMemberCollapsed = false;
+    this.settingsTypesCollapsed = false;
+
     // Calendar filter state
     this._filterDateStart = '';   // ISO date string YYYY-MM-DD
     this._filterDateEnd = '';     // ISO date string YYYY-MM-DD
@@ -809,6 +813,8 @@ class HaHealthRecordPanel extends HTMLElement {
     // The backend reloads the config entry which takes some time
     // Save current URL and tab state before reload
     const currentTab = this.activeTab;
+    const currentMemberCollapsed = this.settingsMemberCollapsed;
+    const currentTypesCollapsed = this.settingsTypesCollapsed;
     const panelUrl = '/ha-health-record';
 
     // Wait a bit then try to reload data, with retries
@@ -830,8 +836,10 @@ class HaHealthRecordPanel extends HTMLElement {
 
       try {
         await this._loadData();
-        // Restore tab state
+        // Restore tab and collapse state
         this.activeTab = currentTab;
+        this.settingsMemberCollapsed = currentMemberCollapsed;
+        this.settingsTypesCollapsed = currentTypesCollapsed;
         this._render();
         return; // Success
       } catch (error) {
@@ -1407,6 +1415,32 @@ class HaHealthRecordPanel extends HTMLElement {
         margin-bottom: 12px;
         padding-bottom: 8px;
         border-bottom: 1px solid var(--divider-color, #e0e0e0);
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        user-select: none;
+      }
+      .settings-section-header:hover {
+        color: var(--primary-color, #03a9f4);
+      }
+      .settings-section-header.collapsed {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+      }
+      .settings-section-header .chevron {
+        font-size: 12px;
+        transition: transform 0.2s;
+      }
+      .settings-section-header .chevron.collapsed {
+        transform: rotate(-90deg);
+      }
+      .settings-section-content {
+        overflow: hidden;
+      }
+      .settings-section-content.collapsed {
+        display: none;
       }
       .settings-section-divider {
         height: 1px;
@@ -2103,11 +2137,29 @@ class HaHealthRecordPanel extends HTMLElement {
 
   _renderSettingsTab() {
     let html = '<div class="manage-section">';
-    html += `<div class="settings-section-header">${this._t('memberInfoSection')}</div>`;
+
+    // Member Info section (collapsible)
+    const memberCollapsed = this.settingsMemberCollapsed;
+    html += `<div class="settings-section-header ${memberCollapsed ? 'collapsed' : ''}" data-toggle-section="member">
+      ${this._t('memberInfoSection')}
+      <span class="chevron ${memberCollapsed ? 'collapsed' : ''}">▼</span>
+    </div>`;
+    html += `<div class="settings-section-content ${memberCollapsed ? 'collapsed' : ''}">`;
     html += this._renderMembersManagement();
+    html += '</div>';
+
     html += '<div class="settings-section-divider"></div>';
-    html += `<div class="settings-section-header">${this._t('recordTypesSection')}</div>`;
+
+    // Record Types section (collapsible)
+    const typesCollapsed = this.settingsTypesCollapsed;
+    html += `<div class="settings-section-header ${typesCollapsed ? 'collapsed' : ''}" data-toggle-section="types">
+      ${this._t('recordTypesSection')}
+      <span class="chevron ${typesCollapsed ? 'collapsed' : ''}">▼</span>
+    </div>`;
+    html += `<div class="settings-section-content ${typesCollapsed ? 'collapsed' : ''}">`;
     html += this._renderRecordTypesManagement();
+    html += '</div>';
+
     html += '</div>';
     return html;
   }
@@ -2335,6 +2387,19 @@ class HaHealthRecordPanel extends HTMLElement {
     // Tab navigation
     this.shadowRoot.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => this._switchTab(tab.dataset.tab));
+    });
+
+    // Settings section collapse/expand
+    this.shadowRoot.querySelectorAll('[data-toggle-section]').forEach(header => {
+      header.addEventListener('click', () => {
+        const section = header.dataset.toggleSection;
+        if (section === 'member') {
+          this.settingsMemberCollapsed = !this.settingsMemberCollapsed;
+        } else if (section === 'types') {
+          this.settingsTypesCollapsed = !this.settingsTypesCollapsed;
+        }
+        this._render();
+      });
     });
 
     // Calendar picker: toggle buttons
