@@ -466,17 +466,19 @@ async def ws_update_record_type(
     current_options = dict(entry.options)
     record_sets = list(current_options.get(CONF_RECORD_SETS, []))
 
-    # Find and update the type
+    # Find and update the type (copy-and-replace to ensure HA detects the change)
     found = False
-    for s in record_sets:
+    for i, s in enumerate(record_sets):
         if s.get(CONF_RECORD_TYPE) == type_id:
-            s[CONF_RECORD_NAME] = name
-            s[CONF_RECORD_UNIT] = unit
+            updated = dict(s)
+            updated[CONF_RECORD_NAME] = name
+            updated[CONF_RECORD_UNIT] = unit
             if default_value is not None:
-                s["default_value"] = default_value
+                updated["default_value"] = default_value
             default_value_mode = msg.get("default_value_mode")
             if default_value_mode is not None:
-                s["default_value_mode"] = default_value_mode
+                updated["default_value_mode"] = default_value_mode
+            record_sets[i] = updated
             found = True
             break
 
