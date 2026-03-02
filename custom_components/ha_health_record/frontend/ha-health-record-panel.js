@@ -37,6 +37,14 @@ class HaHealthRecordPanel extends HTMLElement {
     // New: Search query
     this.searchQuery = '';
 
+    // Calendar filter state
+    this._filterDateStart = '';   // ISO date string YYYY-MM-DD
+    this._filterDateEnd = '';     // ISO date string YYYY-MM-DD
+    this._filterCalendarOpen = ''; // 'start' | 'end' | ''
+    const now_cal = new Date();
+    this._filterCalendarViewMonth = now_cal.getMonth() + 1;
+    this._filterCalendarViewYear = now_cal.getFullYear();
+
     // Localization strings
     this._strings = {
       en: {
@@ -66,7 +74,7 @@ class HaHealthRecordPanel extends HTMLElement {
         records_label: 'Records',
         // Buttons
         addRecordType: '+ Add Record Type',
-        addMember: '+ Add Member',
+        addMember: 'Add Member',
         save: 'Save',
         saving: 'Saving...',
         cancel: 'Cancel',
@@ -100,6 +108,14 @@ class HaHealthRecordPanel extends HTMLElement {
         lastRecord: 'Last Record',
         noRecordsYet: 'No records yet',
         recordTypesCount: 'Record Types',
+        // Calendar
+        start_date: 'Start Date',
+        end_date: 'End Date',
+        january: 'January', february: 'February', march: 'March',
+        april: 'April', may_month: 'May', june: 'June',
+        july: 'July', august: 'August', september: 'September',
+        october: 'October', november: 'November', december: 'December',
+        sun: 'Su', mon: 'Mo', tue: 'Tu', wed: 'We', thu: 'Th', fri: 'Fr', sat: 'Sa',
       },
       'zh-Hant': {
         // Header
@@ -162,6 +178,14 @@ class HaHealthRecordPanel extends HTMLElement {
         lastRecord: '最新紀錄',
         noRecordsYet: '尚無紀錄',
         recordTypesCount: '紀錄類型',
+        // Calendar
+        start_date: '開始日期',
+        end_date: '結束日期',
+        january: '一月', february: '二月', march: '三月',
+        april: '四月', may_month: '五月', june: '六月',
+        july: '七月', august: '八月', september: '九月',
+        october: '十月', november: '十一月', december: '十二月',
+        sun: '日', mon: '一', tue: '二', wed: '三', thu: '四', fri: '五', sat: '六',
       },
       'zh-Hans': {
         // Header
@@ -224,15 +248,26 @@ class HaHealthRecordPanel extends HTMLElement {
         lastRecord: '最新记录',
         noRecordsYet: '尚无记录',
         recordTypesCount: '记录类型',
+        // Calendar
+        start_date: '开始日期',
+        end_date: '结束日期',
+        january: '一月', february: '二月', march: '三月',
+        april: '四月', may_month: '五月', june: '六月',
+        july: '七月', august: '八月', september: '九月',
+        october: '十月', november: '十一月', december: '十二月',
+        sun: '日', mon: '一', tue: '二', wed: '三', thu: '四', fri: '五', sat: '六',
       },
     };
 
-    // Initialize dates
+    // Initialize dates (date-only format YYYY-MM-DD for calendar picker)
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-    this.startDate = this._toLocalISOString(startOfDay);
-    this.endDate = this._toLocalISOString(endOfDay);
+    const pad = (n) => n.toString().padStart(2, '0');
+    const todayISO = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    this._filterDateStart = todayISO;
+    this._filterDateEnd = todayISO;
+    // Derive full datetime for API calls
+    this.startDate = this._toLocalISOString(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0));
+    this.endDate = this._toLocalISOString(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999));
   }
 
   // Get localized string
@@ -273,6 +308,24 @@ class HaHealthRecordPanel extends HTMLElement {
 
   connectedCallback() {
     this._render();
+    // Close calendar on outside click
+    this._onDocumentClick = (e) => {
+      if (this._filterCalendarOpen) {
+        const path = e.composedPath();
+        const inDropdown = path.some(el => el.classList && el.classList.contains('date-picker-wrapper'));
+        if (!inDropdown) {
+          this._filterCalendarOpen = '';
+          this._render();
+        }
+      }
+    };
+    document.addEventListener('click', this._onDocumentClick);
+  }
+
+  disconnectedCallback() {
+    if (this._onDocumentClick) {
+      document.removeEventListener('click', this._onDocumentClick);
+    }
   }
 
   _getLocale() {
@@ -392,13 +445,114 @@ class HaHealthRecordPanel extends HTMLElement {
   }
 
   _handleDateChange() {
-    const startInput = this.shadowRoot.querySelector('#start-date');
-    const endInput = this.shadowRoot.querySelector('#end-date');
-    if (startInput && endInput) {
-      this.startDate = startInput.value;
-      this.endDate = endInput.value;
-      this._loadRecords();
+    // Derive full datetime range from date-only _filterDateStart / _filterDateEnd
+    if (this._filterDateStart) {
+      this.startDate = this._toLocalISOString(new Date(this._filterDateStart + 'T00:00:00'));
     }
+    if (this._filterDateEnd) {
+      this.endDate = this._toLocalISOString(new Date(this._filterDateEnd + 'T23:59:59'));
+    }
+    this._loadRecords();
+  }
+
+  // Calendar helper methods (ported from ha_finance for vanilla web component)
+  _getFilterCalendarDays(month, year) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
+    const prevDays = new Date(year, month - 1, 0).getDate();
+    const cells = [];
+    for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+      cells.push({ day: prevDays - i, current: false });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ day: d, current: true });
+    }
+    let nextDay = 1;
+    while (cells.length % 7 !== 0) {
+      cells.push({ day: nextDay++, current: false });
+    }
+    return cells;
+  }
+
+  _filterCalendarPrev() {
+    if (this._filterCalendarViewMonth === 1) {
+      this._filterCalendarViewMonth = 12;
+      this._filterCalendarViewYear--;
+    } else {
+      this._filterCalendarViewMonth--;
+    }
+    this._render();
+  }
+
+  _filterCalendarNext() {
+    if (this._filterCalendarViewMonth === 12) {
+      this._filterCalendarViewMonth = 1;
+      this._filterCalendarViewYear++;
+    } else {
+      this._filterCalendarViewMonth++;
+    }
+    this._render();
+  }
+
+  _filterCalendarSelectDay(day) {
+    const m = String(this._filterCalendarViewMonth).padStart(2, '0');
+    const d = String(day).padStart(2, '0');
+    const iso = `${this._filterCalendarViewYear}-${m}-${d}`;
+    if (this._filterCalendarOpen === 'start') {
+      this._filterDateStart = iso;
+    } else if (this._filterCalendarOpen === 'end') {
+      this._filterDateEnd = iso;
+    }
+    this._filterCalendarOpen = '';
+    this._handleDateChange();
+  }
+
+  _formatDateForInput(isoString) {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString + 'T00:00:00');
+      return date.toLocaleDateString(this._getLocale(), {
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      });
+    } catch { return isoString; }
+  }
+
+  _isFilterDateSelected(day, month, year, isoString) {
+    if (!isoString) return false;
+    const parts = isoString.split('-');
+    return parseInt(parts[0]) === year && parseInt(parts[1]) === month && parseInt(parts[2]) === day;
+  }
+
+  _renderFilterCalendar(which) {
+    const monthNames = ['', 'january', 'february', 'march', 'april', 'may_month', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const weekdays = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const viewMonth = this._filterCalendarViewMonth;
+    const viewYear = this._filterCalendarViewYear;
+    const cells = this._getFilterCalendarDays(viewMonth, viewYear);
+    const selectedIso = which === 'start' ? this._filterDateStart : this._filterDateEnd;
+
+    let html = `<div class="date-picker-dropdown" data-calendar-dropdown>
+      <div class="calendar-widget">
+        <div class="calendar-header">
+          <button type="button" data-calendar-prev>&lsaquo;</button>
+          <span>${this._t(monthNames[viewMonth])} ${viewYear}</span>
+          <button type="button" data-calendar-next>&rsaquo;</button>
+        </div>
+        <div class="calendar-weekdays">`;
+    for (const wd of weekdays) {
+      html += `<span>${this._t(wd)}</span>`;
+    }
+    html += `</div><div class="calendar-days">`;
+    for (const cell of cells) {
+      if (cell.current) {
+        const selected = this._isFilterDateSelected(cell.day, viewMonth, viewYear, selectedIso) ? ' selected' : '';
+        html += `<button type="button" class="calendar-day${selected}" data-calendar-day="${cell.day}">${cell.day}</button>`;
+      } else {
+        html += `<span class="calendar-day other-month">${cell.day}</span>`;
+      }
+    }
+    html += `</div></div></div>`;
+    return html;
   }
 
   // Toggle sidebar
@@ -903,8 +1057,8 @@ class HaHealthRecordPanel extends HTMLElement {
       }
       .search-row-input::placeholder { color: var(--secondary-text-color); }
 
-      /* TIME FILTER ROW */
-      .time-filter-row {
+      /* DATE RANGE FILTER (calendar picker) */
+      .filter-bar {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -912,28 +1066,146 @@ class HaHealthRecordPanel extends HTMLElement {
         margin: 0 -16px 16px -16px;
         flex-wrap: wrap;
       }
-      .time-filter-row input {
-        padding: 8px 12px;
+      .filter-bar .date-range {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .filter-bar .date-separator {
+        color: var(--secondary-text-color);
+        flex-shrink: 0;
+      }
+      .date-picker-wrapper {
+        position: relative;
+        display: inline-block;
+      }
+      .date-picker-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
         border: 1px solid var(--divider-color);
         border-radius: 8px;
+        padding: 8px 12px;
         background: var(--card-background-color);
         color: var(--primary-text-color);
-        font-size: 14px;
-      }
-      .time-filter-row span {
-        color: var(--secondary-text-color);
-      }
-      .filter-btn {
-        padding: 8px 16px;
-        background: var(--primary-color);
-        color: white;
-        border: none;
-        border-radius: 8px;
         cursor: pointer;
         font-size: 14px;
-        transition: opacity 0.2s;
+        min-width: 120px;
+        transition: border-color 0.2s;
       }
-      .filter-btn:hover { opacity: 0.9; }
+      .date-picker-trigger:hover {
+        border-color: var(--primary-color);
+      }
+      .date-picker-trigger .placeholder {
+        color: var(--secondary-text-color);
+      }
+      .date-picker-trigger svg {
+        flex-shrink: 0;
+        color: var(--secondary-text-color);
+      }
+      .date-picker-clear {
+        position: absolute;
+        top: 50%;
+        right: -20px;
+        transform: translateY(-50%);
+        border: none;
+        background: transparent;
+        color: var(--secondary-text-color);
+        cursor: pointer;
+        font-size: 16px;
+        padding: 2px 4px;
+        line-height: 1;
+      }
+      .date-picker-clear:hover {
+        color: var(--error-color, #f44336);
+      }
+      .date-picker-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 200;
+        margin-top: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        border-radius: 8px;
+        background: var(--card-background-color, #fff);
+      }
+      .date-picker-dropdown .calendar-widget {
+        min-width: 260px;
+      }
+      .calendar-widget {
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        padding: 12px;
+        background: var(--card-background-color);
+      }
+      .calendar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-weight: 500;
+        font-size: 15px;
+        color: var(--primary-text-color);
+      }
+      .calendar-header button {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        color: var(--primary-text-color);
+        cursor: pointer;
+        font-size: 18px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+      }
+      .calendar-header button:hover {
+        background: var(--secondary-background-color, rgba(0,0,0,0.05));
+      }
+      .calendar-weekdays {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        text-align: center;
+        font-size: 12px;
+        color: var(--secondary-text-color);
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+      .calendar-days {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 2px;
+      }
+      .calendar-day {
+        aspect-ratio: 1;
+        border: none;
+        background: transparent;
+        color: var(--primary-text-color);
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+        padding: 0;
+        min-width: 32px;
+        min-height: 32px;
+      }
+      .calendar-day:hover {
+        background: var(--secondary-background-color, rgba(0,0,0,0.05));
+      }
+      .calendar-day.selected {
+        background: var(--primary-color);
+        color: var(--text-primary-color, white);
+        font-weight: 600;
+      }
+      .calendar-day.other-month {
+        color: var(--disabled-text-color, #ccc);
+        pointer-events: none;
+      }
 
       /* MEMBER SWITCHER - Chip-style cards */
       .member-switcher-row {
@@ -1483,9 +1755,32 @@ class HaHealthRecordPanel extends HTMLElement {
           height: auto;
           padding: 8px;
         }
-        .time-filter-row {
+        .filter-bar {
           margin: 0 -8px 8px -8px;
           padding: 8px;
+        }
+        .filter-bar .date-range {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          width: 100%;
+        }
+        .date-picker-wrapper {
+          flex: 1;
+          min-width: 0;
+        }
+        .date-picker-trigger {
+          width: 100%;
+          min-width: 0;
+          font-size: 13px;
+          padding: 6px 8px;
+        }
+        .date-picker-dropdown {
+          left: auto;
+          right: 0;
+        }
+        .filter-bar .date-separator {
+          flex-shrink: 0;
         }
         .member-switcher-row {
           padding: 0 8px 16px 8px;
@@ -1521,9 +1816,6 @@ class HaHealthRecordPanel extends HTMLElement {
       // Top Bar (like Finance Record)
       content = `
         <div class="top-bar">
-          <button class="top-bar-sidebar-btn" id="sidebar-btn" title="${this._t('menu')}">
-            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z"/></svg>
-          </button>
           <h1 class="top-bar-title">${this._t('title')}</h1>
         </div>
       `;
@@ -1638,13 +1930,33 @@ class HaHealthRecordPanel extends HTMLElement {
       </div>
     `;
 
-    // Time Filter Row
+    // Date Range Filter (calendar picker)
+    const calendarSvg = '<svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M19,19H5V8H19M16,1V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3H18V1M17,12H12V17H17V12Z"/></svg>';
     html += `
-      <div class="time-filter-row">
-        <input type="datetime-local" id="start-date" value="${this.startDate}">
-        <span>${this._t('to')}</span>
-        <input type="datetime-local" id="end-date" value="${this.endDate}">
-        <button class="filter-btn" id="filter-btn">${this._t('filter')}</button>
+      <div class="filter-bar">
+        <div class="date-range">
+          <div class="date-picker-wrapper" data-picker="start">
+            <button type="button" class="date-picker-trigger" data-toggle-calendar="start">
+              <span class="${!this._filterDateStart ? 'placeholder' : ''}">
+                ${this._filterDateStart ? this._formatDateForInput(this._filterDateStart) : this._t('start_date')}
+              </span>
+              ${calendarSvg}
+            </button>
+            ${this._filterCalendarOpen === 'start' ? this._renderFilterCalendar('start') : ''}
+            ${this._filterDateStart ? '<button type="button" class="date-picker-clear" data-clear-date="start">&times;</button>' : ''}
+          </div>
+          <span class="date-separator">-</span>
+          <div class="date-picker-wrapper" data-picker="end">
+            <button type="button" class="date-picker-trigger" data-toggle-calendar="end">
+              <span class="${!this._filterDateEnd ? 'placeholder' : ''}">
+                ${this._filterDateEnd ? this._formatDateForInput(this._filterDateEnd) : this._t('end_date')}
+              </span>
+              ${calendarSvg}
+            </button>
+            ${this._filterCalendarOpen === 'end' ? this._renderFilterCalendar('end') : ''}
+            ${this._filterDateEnd ? '<button type="button" class="date-picker-clear" data-clear-date="end">&times;</button>' : ''}
+          </div>
+        </div>
       </div>
     `;
 
@@ -1657,7 +1969,6 @@ class HaHealthRecordPanel extends HTMLElement {
       if (sets.length > 0) {
         html += `
           <div class="member-card" style="width: 100%; box-sizing: border-box;">
-            <h3>${this._escapeHtml(selectedMember.name)}</h3>
             <div class="quick-actions">
         `;
 
@@ -1969,12 +2280,6 @@ class HaHealthRecordPanel extends HTMLElement {
   }
 
   _attachEventListeners() {
-    // Sidebar toggle
-    const sidebarBtn = this.shadowRoot.querySelector('#sidebar-btn');
-    if (sidebarBtn) {
-      sidebarBtn.addEventListener('click', () => this._toggleSidebar());
-    }
-
     // Tab navigation
     this.shadowRoot.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => this._switchTab(tab.dataset.tab));
@@ -1985,11 +2290,57 @@ class HaHealthRecordPanel extends HTMLElement {
       tab.addEventListener('click', () => this._switchSettingsSubTab(tab.dataset.settingsSubtab));
     });
 
-    // Filter button
-    const filterBtn = this.shadowRoot.querySelector('#filter-btn');
-    if (filterBtn) {
-      filterBtn.addEventListener('click', () => this._handleDateChange());
-    }
+    // Calendar picker: toggle buttons
+    this.shadowRoot.querySelectorAll('[data-toggle-calendar]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const which = btn.dataset.toggleCalendar; // 'start' or 'end'
+        this._filterCalendarOpen = this._filterCalendarOpen === which ? '' : which;
+        this._render();
+      });
+    });
+
+    // Calendar picker: day selection
+    this.shadowRoot.querySelectorAll('[data-calendar-day]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const day = parseInt(btn.dataset.calendarDay);
+        this._filterCalendarSelectDay(day);
+      });
+    });
+
+    // Calendar picker: prev/next month
+    this.shadowRoot.querySelectorAll('[data-calendar-prev]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._filterCalendarPrev();
+      });
+    });
+    this.shadowRoot.querySelectorAll('[data-calendar-next]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._filterCalendarNext();
+      });
+    });
+
+    // Calendar picker: clear date
+    this.shadowRoot.querySelectorAll('[data-clear-date]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const which = btn.dataset.clearDate;
+        if (which === 'start') {
+          this._filterDateStart = '';
+        } else {
+          this._filterDateEnd = '';
+        }
+        this._handleDateChange();
+      });
+    });
+
+    // Calendar dropdown: prevent clicks inside from closing
+    this.shadowRoot.querySelectorAll('[data-calendar-dropdown]').forEach(el => {
+      el.addEventListener('click', (e) => e.stopPropagation());
+    });
 
     // Search input
     const searchInput = this.shadowRoot.querySelector('#search-input');
