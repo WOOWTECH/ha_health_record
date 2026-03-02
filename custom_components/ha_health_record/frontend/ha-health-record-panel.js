@@ -1060,17 +1060,7 @@ class HaHealthRecordPanel extends HTMLElement {
       }
       .top-bar-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
-      /* SEARCH ROW */
-      .search-row {
-        display: flex;
-        align-items: center;
-        height: 48px;
-        padding: 0 16px;
-        background: var(--primary-background-color);
-        border-bottom: 1px solid var(--divider-color);
-        margin: 0 -16px 16px -16px;
-        gap: 8px;
-      }
+      /* SEARCH INPUT (inside filter-bar) */
       .search-row-input-wrapper {
         flex: 1;
         display: flex;
@@ -1111,7 +1101,7 @@ class HaHealthRecordPanel extends HTMLElement {
         gap: 8px;
         padding: 0 16px;
         margin: 0 -16px 16px -16px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
       }
       .filter-bar .date-range {
         display: flex;
@@ -1995,26 +1985,10 @@ class HaHealthRecordPanel extends HTMLElement {
   _renderRecordTab() {
     let html = '';
 
-    // Search Row
-    html += `
-      <div class="search-row">
-        <div class="search-row-input-wrapper">
-          <svg class="search-row-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/></svg>
-          <input
-            class="search-row-input"
-            type="text"
-            id="search-input"
-            placeholder="${this._t('search')}"
-            value="${this._escapeHtml(this.searchQuery)}"
-          />
-        </div>
-      </div>
-    `;
-
     // Lookup selected member early (needed for Add Record button and filter buttons)
     const selectedMember = this.members.find(m => m.id === this.selectedMemberId);
 
-    // Date Range Filter (calendar picker) + Add Record button
+    // Combined filter bar: Date Range + Search + Add Record button
     const calendarSvg = '<svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M19,19H5V8H19M16,1V3H8V1H6V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3H18V1M17,12H12V17H17V12Z"/></svg>';
     html += `
       <div class="filter-bar">
@@ -2040,6 +2014,16 @@ class HaHealthRecordPanel extends HTMLElement {
             ${this._filterCalendarOpen === 'end' ? this._renderFilterCalendar('end') : ''}
             ${this._filterDateEnd ? '<button type="button" class="date-picker-clear" data-clear-date="end">&times;</button>' : ''}
           </div>
+        </div>
+        <div class="search-row-input-wrapper">
+          <svg class="search-row-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/></svg>
+          <input
+            class="search-row-input"
+            type="text"
+            id="search-input"
+            placeholder="${this._t('search')}"
+            value="${this._escapeHtml(this.searchQuery)}"
+          />
         </div>
         <button class="btn btn-primary add-record-btn" id="add-record-btn" ${!selectedMember ? 'disabled' : ''}>
           + ${this._t('addRecord')}
