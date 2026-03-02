@@ -415,7 +415,13 @@ class HaHealthRecordPanel extends HTMLElement {
   // Search input change
   _onSearchInput(e) {
     this.searchQuery = e.target.value;
+    const cursorPos = e.target.selectionStart;
     this._render();
+    const input = this.shadowRoot.querySelector('#search-input');
+    if (input) {
+      input.focus();
+      input.setSelectionRange(cursorPos, cursorPos);
+    }
   }
 
   // Get filtered records based on member and search
