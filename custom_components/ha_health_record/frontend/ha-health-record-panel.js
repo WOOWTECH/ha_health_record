@@ -21,7 +21,6 @@ class HaHealthRecordPanel extends HTMLElement {
 
     // Tab state
     this.activeTab = 'record'; // 'record' | 'settings'
-    this.settingsSubTab = 'members'; // 'members' | 'recordTypes'
     this.expandedRecordId = null;
     this.editingRecord = null; // { value, note, timestamp }
     this.showTypeDialog = false;
@@ -66,6 +65,9 @@ class HaHealthRecordPanel extends HTMLElement {
         // Sub-tabs
         recordTypes: 'Record Types',
         members: 'Members',
+        // Section headers
+        memberInfoSection: 'Member Info',
+        recordTypesSection: 'Record Types',
         // Timeline
         noMembers: 'No members configured. Go to the Settings tab to add members.',
         noRecords: 'No records for this date range.',
@@ -139,6 +141,9 @@ class HaHealthRecordPanel extends HTMLElement {
         // Sub-tabs
         recordTypes: '紀錄類型',
         members: '成員',
+        // Section headers
+        memberInfoSection: '成員資訊',
+        recordTypesSection: '紀錄類型',
         // Timeline
         noMembers: '尚未設定成員。請前往「設定」分頁新增成員。',
         noRecords: '此日期範圍內沒有紀錄。',
@@ -212,6 +217,9 @@ class HaHealthRecordPanel extends HTMLElement {
         // Sub-tabs
         recordTypes: '记录类型',
         members: '成员',
+        // Section headers
+        memberInfoSection: '成员信息',
+        recordTypesSection: '记录类型',
         // Timeline
         noMembers: '尚未设置成员。请前往"设置"标签页添加成员。',
         noRecords: '此日期范围内没有记录。',
@@ -652,11 +660,6 @@ class HaHealthRecordPanel extends HTMLElement {
     this._render();
   }
 
-  _switchSettingsSubTab(subTab) {
-    this.settingsSubTab = subTab;
-    this._render();
-  }
-
   // ============================================================================
   // Inline Record Editing
   // ============================================================================
@@ -806,7 +809,6 @@ class HaHealthRecordPanel extends HTMLElement {
     // The backend reloads the config entry which takes some time
     // Save current URL and tab state before reload
     const currentTab = this.activeTab;
-    const currentSettingsSubTab = this.settingsSubTab;
     const panelUrl = '/ha-health-record';
 
     // Wait a bit then try to reload data, with retries
@@ -830,7 +832,6 @@ class HaHealthRecordPanel extends HTMLElement {
         await this._loadData();
         // Restore tab state
         this.activeTab = currentTab;
-        this.settingsSubTab = currentSettingsSubTab;
         this._render();
         return; // Success
       } catch (error) {
@@ -1398,28 +1399,19 @@ class HaHealthRecordPanel extends HTMLElement {
         border-bottom-color: var(--primary-color, #03a9f4);
       }
 
-      /* Sub-tabs */
-      .sub-tabs {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 16px;
-      }
-      .sub-tab {
-        padding: 8px 16px;
-        background: var(--secondary-background-color, #e0e0e0);
-        border: none;
-        border-radius: 20px;
-        cursor: pointer;
-        font-size: 13px;
+      /* Settings section headers */
+      .settings-section-header {
+        font-size: 14px;
+        font-weight: 600;
         color: var(--primary-text-color, #212121);
-        transition: background 0.2s;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--divider-color, #e0e0e0);
       }
-      .sub-tab:hover {
-        background: var(--divider-color, #bdbdbd);
-      }
-      .sub-tab.active {
-        background: var(--primary-color, #03a9f4);
-        color: white;
+      .settings-section-divider {
+        height: 1px;
+        background: var(--divider-color, #e0e0e0);
+        margin: 20px 0;
       }
 
       .members-section {
@@ -2110,24 +2102,12 @@ class HaHealthRecordPanel extends HTMLElement {
   }
 
   _renderSettingsTab() {
-    let html = '';
-
-    // Settings sub-tabs: Members | Record Types
-    html += `
-      <div class="sub-tabs">
-        <button class="sub-tab ${this.settingsSubTab === 'members' ? 'active' : ''}" data-settings-subtab="members">${this._t('members')}</button>
-        <button class="sub-tab ${this.settingsSubTab === 'recordTypes' ? 'active' : ''}" data-settings-subtab="recordTypes">${this._t('recordTypes')}</button>
-      </div>
-    `;
-
-    html += '<div class="manage-section">';
-
-    if (this.settingsSubTab === 'members') {
-      html += this._renderMembersManagement();
-    } else {
-      html += this._renderRecordTypesManagement();
-    }
-
+    let html = '<div class="manage-section">';
+    html += `<div class="settings-section-header">${this._t('memberInfoSection')}</div>`;
+    html += this._renderMembersManagement();
+    html += '<div class="settings-section-divider"></div>';
+    html += `<div class="settings-section-header">${this._t('recordTypesSection')}</div>`;
+    html += this._renderRecordTypesManagement();
     html += '</div>';
     return html;
   }
@@ -2144,8 +2124,6 @@ class HaHealthRecordPanel extends HTMLElement {
         html += `<div class="empty">${this._t('selectMember')}</div>`;
       }
     } else {
-      html += `<div class="member-label">${this._t('member')}: ${this._escapeHtml(selectedMember.name)}</div>`;
-
       const recordSets = selectedMember.record_sets || [];
       if (recordSets.length === 0) {
         html += `<div class="empty" style="padding: 16px;">${this._t('noRecordTypes')}</div>`;
@@ -2357,11 +2335,6 @@ class HaHealthRecordPanel extends HTMLElement {
     // Tab navigation
     this.shadowRoot.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => this._switchTab(tab.dataset.tab));
-    });
-
-    // Settings sub-tab navigation
-    this.shadowRoot.querySelectorAll('.sub-tab[data-settings-subtab]').forEach(tab => {
-      tab.addEventListener('click', () => this._switchSettingsSubTab(tab.dataset.settingsSubtab));
     });
 
     // Calendar picker: toggle buttons
