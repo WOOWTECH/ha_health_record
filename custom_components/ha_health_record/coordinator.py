@@ -79,6 +79,7 @@ class RecordSet:
     name: str
     unit: str
     default_value: float = 0
+    default_value_mode: str = "fixed"  # "fixed" or "last_value"
     current_value: float | None = None
     current_note: str = ""
     last_record: Record = field(default_factory=Record)
@@ -155,6 +156,7 @@ class HealthRecordCoordinator:
                 name=rs_data[CONF_RECORD_NAME],
                 unit=rs_data[CONF_RECORD_UNIT],
                 default_value=rs_data.get("default_value", 0),
+                default_value_mode=rs_data.get("default_value_mode", "fixed"),
             )
 
     async def async_load(self) -> None:

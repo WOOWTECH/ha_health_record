@@ -139,6 +139,7 @@ def ws_get_members(
                     "name": s.name,
                     "unit": s.unit,
                     "default_value": s.default_value,
+                    "default_value_mode": s.default_value_mode,
                     "current_value": s.current_value,
                     "last_record": {
                         "value": s.last_record.value,
@@ -362,6 +363,7 @@ def ws_delete_record(
         vol.Required("name"): str,
         vol.Required("unit"): str,
         vol.Optional("default_value", default=0): valid_float,
+        vol.Optional("default_value_mode", default="fixed"): vol.In(["fixed", "last_value"]),
     }
 )
 @websocket_api.async_response
@@ -411,6 +413,7 @@ async def ws_add_record_type(
         CONF_RECORD_NAME: name,
         CONF_RECORD_UNIT: unit,
         "default_value": default_value,
+        "default_value_mode": msg.get("default_value_mode", "fixed"),
     })
 
     current_options[CONF_RECORD_SETS] = record_sets
@@ -432,6 +435,7 @@ async def ws_add_record_type(
         vol.Required("name"): str,
         vol.Required("unit"): str,
         vol.Optional("default_value"): valid_float,
+        vol.Optional("default_value_mode"): vol.In(["fixed", "last_value"]),
     }
 )
 @websocket_api.async_response
@@ -470,6 +474,9 @@ async def ws_update_record_type(
             s[CONF_RECORD_UNIT] = unit
             if default_value is not None:
                 s["default_value"] = default_value
+            default_value_mode = msg.get("default_value_mode")
+            if default_value_mode is not None:
+                s["default_value_mode"] = default_value_mode
             found = True
             break
 

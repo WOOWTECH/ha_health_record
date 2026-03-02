@@ -109,6 +109,10 @@ class HaHealthRecordPanel extends HTMLElement {
         namePlaceholder: 'e.g., Feeding',
         unitPlaceholder: 'e.g., ml',
         defaultValue: 'Default Value',
+        defaultValueMode: 'Default Value Mode',
+        defaultValueFixed: 'Fixed Value',
+        defaultValueLastValue: 'Last Value',
+        lastValue: 'Last Value',
         memberNamePlaceholder: 'e.g., Baby Emma',
         memberIdLabel: 'ID (optional, auto-generated from name)',
         memberIdPlaceholder: 'e.g., baby_emma',
@@ -185,6 +189,10 @@ class HaHealthRecordPanel extends HTMLElement {
         namePlaceholder: '例如：餵食',
         unitPlaceholder: '例如：ml',
         defaultValue: '預設數值',
+        defaultValueMode: '預設數值模式',
+        defaultValueFixed: '固定值',
+        defaultValueLastValue: '上次數值',
+        lastValue: '上次數值',
         memberNamePlaceholder: '例如：寶寶小明',
         memberIdLabel: 'ID（選填，將自動從名稱產生）',
         memberIdPlaceholder: '例如：baby_ming',
@@ -261,6 +269,10 @@ class HaHealthRecordPanel extends HTMLElement {
         namePlaceholder: '例如：喂食',
         unitPlaceholder: '例如：ml',
         defaultValue: '默认数值',
+        defaultValueMode: '默认数值模式',
+        defaultValueFixed: '固定值',
+        defaultValueLastValue: '上次数值',
+        lastValue: '上次数值',
         memberNamePlaceholder: '例如：宝宝小明',
         memberIdLabel: 'ID（可选，将自动从名称生成）',
         memberIdPlaceholder: '例如：baby_ming',
@@ -432,7 +444,10 @@ class HaHealthRecordPanel extends HTMLElement {
     this.selectedMember = member;
     this.selectedType = recordType;
     const typeInfo = (member.record_sets || []).find(s => s.type === recordType);
-    this.inputValue = typeInfo?.default_value ?? 0;
+    const useLastValue = typeInfo?.default_value_mode === 'last_value';
+    this.inputValue = useLastValue
+      ? (typeInfo?.current_value ?? typeInfo?.default_value ?? 0)
+      : (typeInfo?.default_value ?? 0);
     this.inputNote = '';
     this.inputTimestamp = this._toLocalISOString(new Date());
     this.showInputDialog = true;
@@ -742,7 +757,7 @@ class HaHealthRecordPanel extends HTMLElement {
     this.editingType = {
       mode: 'add',
       memberId: this.selectedMemberId || this.members[0]?.id || '',
-      data: { name: '', unit: '', default_value: 0 },
+      data: { name: '', unit: '', default_value: 0, default_value_mode: 'fixed' },
     };
     this.showTypeDialog = true;
     this._render();
@@ -757,6 +772,7 @@ class HaHealthRecordPanel extends HTMLElement {
         name: typeData.name,
         unit: typeData.unit,
         default_value: typeData.default_value ?? 0,
+        default_value_mode: typeData.default_value_mode || 'fixed',
       },
     };
     this.showTypeDialog = true;
@@ -784,6 +800,7 @@ class HaHealthRecordPanel extends HTMLElement {
           name: data.name,
           unit: data.unit,
           default_value: data.default_value,
+          default_value_mode: data.default_value_mode || 'fixed',
         });
       } else {
         await this._hass.callWS({
@@ -793,6 +810,7 @@ class HaHealthRecordPanel extends HTMLElement {
           name: data.name,
           unit: data.unit,
           default_value: data.default_value,
+          default_value_mode: data.default_value_mode || 'fixed',
         });
       }
 
@@ -2186,7 +2204,7 @@ class HaHealthRecordPanel extends HTMLElement {
             <div class="type-card">
               <div class="type-info">
                 <div class="type-name">${this._escapeHtml(recordSet.name)}</div>
-                <div class="type-details">${this._t('unit')}: ${this._escapeHtml(recordSet.unit)} | ${this._t('defaultValue')}: ${recordSet.default_value ?? 0}</div>
+                <div class="type-details">${this._t('unit')}: ${this._escapeHtml(recordSet.unit)} | ${this._t('defaultValue')}: ${recordSet.default_value_mode === 'last_value' ? this._t('lastValue') : (recordSet.default_value ?? 0)}</div>
               </div>
               <div class="type-actions">
                 <button class="btn-icon edit-type-btn" data-member="${selectedMember.id}" data-type='${typeJson}'>✏️</button>
@@ -2312,9 +2330,18 @@ class HaHealthRecordPanel extends HTMLElement {
               <input type="text" id="type-unit" value="${this._escapeHtml(this.editingType.data.unit)}" placeholder="${this._t('unitPlaceholder')}">
             </div>
             <div class="dialog-field">
+              <label>${this._t('defaultValueMode')}</label>
+              <select id="type-default-mode">
+                <option value="fixed" ${(this.editingType.data.default_value_mode || 'fixed') === 'fixed' ? 'selected' : ''}>${this._t('defaultValueFixed')}</option>
+                <option value="last_value" ${this.editingType.data.default_value_mode === 'last_value' ? 'selected' : ''}>${this._t('defaultValueLastValue')}</option>
+              </select>
+            </div>
+            ${(this.editingType.data.default_value_mode || 'fixed') === 'fixed' ? `
+            <div class="dialog-field">
               <label>${this._t('defaultValue')}</label>
               <input type="number" id="type-default" value="${this.editingType.data.default_value}" step="0.1">
             </div>
+            ` : ''}
             <div class="dialog-actions">
               <button class="btn btn-secondary" id="cancel-type-btn">${this._t('cancel')}</button>
               <button class="btn btn-primary" id="save-type-btn" ${this.submitting ? 'disabled' : ''}>
@@ -2653,7 +2680,10 @@ class HaHealthRecordPanel extends HTMLElement {
         // Switch to the new type and update default value
         this.selectedType = inputTypeSelect.value;
         const typeInfo = (this.selectedMember.record_sets || []).find(s => s.type === this.selectedType);
-        this.inputValue = typeInfo?.default_value ?? 0;
+        const useLastValue = typeInfo?.default_value_mode === 'last_value';
+        this.inputValue = useLastValue
+          ? (typeInfo?.current_value ?? typeInfo?.default_value ?? 0)
+          : (typeInfo?.default_value ?? 0);
         this._render();
       });
     }
@@ -2678,13 +2708,34 @@ class HaHealthRecordPanel extends HTMLElement {
         const nameInput = this.shadowRoot.querySelector('#type-name');
         const unitInput = this.shadowRoot.querySelector('#type-unit');
         const defaultInput = this.shadowRoot.querySelector('#type-default');
+        const modeSelect = this.shadowRoot.querySelector('#type-default-mode');
 
         if (memberSelect) this.editingType.memberId = memberSelect.value;
         if (nameInput) this.editingType.data.name = nameInput.value;
         if (unitInput) this.editingType.data.unit = unitInput.value;
+        if (modeSelect) this.editingType.data.default_value_mode = modeSelect.value;
         if (defaultInput) this.editingType.data.default_value = parseFloat(defaultInput.value) || 0;
 
         this._saveType();
+      });
+    }
+
+    // Type dialog: mode selector change (re-render to show/hide fixed value input)
+    const typeDefaultMode = this.shadowRoot.querySelector('#type-default-mode');
+    if (typeDefaultMode) {
+      typeDefaultMode.addEventListener('change', () => {
+        // Capture current form values before re-render
+        const nameInput = this.shadowRoot.querySelector('#type-name');
+        const unitInput = this.shadowRoot.querySelector('#type-unit');
+        const defaultInput = this.shadowRoot.querySelector('#type-default');
+        const memberSelect = this.shadowRoot.querySelector('#type-member');
+
+        if (nameInput) this.editingType.data.name = nameInput.value;
+        if (unitInput) this.editingType.data.unit = unitInput.value;
+        if (defaultInput) this.editingType.data.default_value = parseFloat(defaultInput.value) || 0;
+        if (memberSelect) this.editingType.memberId = memberSelect.value;
+        this.editingType.data.default_value_mode = typeDefaultMode.value;
+        this._render();
       });
     }
 
