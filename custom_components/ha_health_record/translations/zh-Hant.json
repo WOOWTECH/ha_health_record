@@ -38,41 +38,5 @@
     "abort": {
       "already_configured": "此成員已經設定過了。"
     }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "管理紀錄類型",
-        "menu_options": {
-          "add_record_type": "新增紀錄類型",
-          "manage_sets": "管理現有套組"
-        }
-      },
-      "add_record_type": {
-        "title": "新增紀錄類型",
-        "description": "選擇要追蹤的紀錄類型。",
-        "data": {
-          "record_type": "紀錄類型",
-          "record_name": "自訂名稱",
-          "record_unit": "自訂單位"
-        }
-      },
-      "manage_sets": {
-        "title": "管理現有套組",
-        "description": "紀錄套組：{count} 個。選擇要刪除的套組。",
-        "data": {
-          "delete_sets": "選擇要刪除的套組"
-        }
-      }
-    },
-    "error": {
-      "invalid_type": "選擇的類型無效。",
-      "duplicate_set": "此套組已經存在。",
-      "required_name": "自訂類型必須輸入名稱。",
-      "invalid_name": "名稱必須包含至少一個英數字元。"
-    },
-    "abort": {
-      "no_sets": "沒有套組可以管理。"
-    }
   }
 }

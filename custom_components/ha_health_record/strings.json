@@ -40,41 +40,5 @@
     "abort": {
       "already_configured": "This member is already configured."
     }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Manage Record Types",
-        "menu_options": {
-          "add_record_type": "Add Record Type",
-          "manage_sets": "Manage Existing Sets"
-        }
-      },
-      "add_record_type": {
-        "title": "Add Record Type",
-        "description": "Select a record type to track.",
-        "data": {
-          "record_type": "Record Type",
-          "record_name": "Custom Name",
-          "record_unit": "Custom Unit"
-        }
-      },
-      "manage_sets": {
-        "title": "Manage Existing Sets",
-        "description": "Record sets: {count}. Select sets to delete.",
-        "data": {
-          "delete_sets": "Select sets to delete"
-        }
-      }
-    },
-    "error": {
-      "invalid_type": "Invalid type selected.",
-      "duplicate_set": "This set already exists.",
-      "required_name": "Name is required for custom type.",
-      "invalid_name": "Name must contain at least one alphanumeric character."
-    },
-    "abort": {
-      "no_sets": "No sets to manage."
-    }
   }
 }
