@@ -7,6 +7,7 @@
   "documentation": "https://github.com/oaoomg/ha_health_record",
   "integration_type": "service",
   "iot_class": "calculated",
+  "issue_tracker": "https://github.com/oaoomg/ha_health_record/issues",
   "requirements": [],
   "version": "1.4.1"
 }
