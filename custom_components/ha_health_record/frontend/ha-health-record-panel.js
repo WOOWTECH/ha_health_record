@@ -2424,14 +2424,6 @@ class HaHealthRecordPanel extends HTMLElement {
         <div class="dialog-overlay" id="type-dialog-overlay">
           <div class="dialog">
             <h3>${dialogTitle}</h3>
-            ${isAdd ? `
-              <div class="dialog-field">
-                <label>${this._t('member')}</label>
-                <select id="type-member">
-                  ${this.members.map(m => `<option value="${m.id}" ${m.id === this.editingType.memberId ? 'selected' : ''}>${this._escapeHtml(m.name)}</option>`).join('')}
-                </select>
-              </div>
-            ` : ''}
             <div class="dialog-field">
               <label>${this._t('name')}</label>
               <input type="text" id="type-name" value="${this._escapeHtml(this.editingType.data.name)}" placeholder="${this._t('namePlaceholder')}">
@@ -2823,13 +2815,11 @@ class HaHealthRecordPanel extends HTMLElement {
     const saveTypeBtn = this.shadowRoot.querySelector('#save-type-btn');
     if (saveTypeBtn) {
       saveTypeBtn.addEventListener('click', () => {
-        const memberSelect = this.shadowRoot.querySelector('#type-member');
         const nameInput = this.shadowRoot.querySelector('#type-name');
         const unitInput = this.shadowRoot.querySelector('#type-unit');
         const defaultInput = this.shadowRoot.querySelector('#type-default');
         const modeSelect = this.shadowRoot.querySelector('#type-default-mode');
 
-        if (memberSelect) this.editingType.memberId = memberSelect.value;
         if (nameInput) this.editingType.data.name = nameInput.value;
         if (unitInput) this.editingType.data.unit = unitInput.value;
         if (modeSelect) this.editingType.data.default_value_mode = modeSelect.value;
