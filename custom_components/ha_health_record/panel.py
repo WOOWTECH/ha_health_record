@@ -1,6 +1,8 @@
 """Panel registration and WebSocket API for Ha Health Record."""
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import math
 import time
@@ -49,6 +51,7 @@ def register_websocket_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_add_member)
     websocket_api.async_register_command(hass, ws_update_member)
     websocket_api.async_register_command(hass, ws_delete_member)
+    websocket_api.async_register_command(hass, ws_export_csv)
 
 
 async def async_setup_panel(hass: HomeAssistant) -> None:
@@ -192,6 +195,52 @@ def ws_get_records(
     records.sort(key=lambda x: x["timestamp"], reverse=True)
 
     connection.send_result(msg["id"], {"records": records})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "ha_health_record/export_csv",
+        vol.Required("member_id"): str,
+    }
+)
+@callback
+def ws_export_csv(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Handle export_csv WebSocket command."""
+    member_id = msg["member_id"]
+
+    coordinator = _find_coordinator(hass, member_id)
+    if coordinator is None:
+        connection.send_error(msg["id"], "member_not_found", f"Member {member_id} not found")
+        return
+
+    records = list(coordinator.records)
+    records.sort(key=lambda r: r.get("timestamp", ""))
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["timestamp", "record_type", "record_name", "value", "unit", "note"])
+
+    for record in records:
+        type_id = record.get("record_type", "")
+        rs = coordinator.record_sets.get(type_id)
+        writer.writerow([
+            record.get("timestamp", ""),
+            type_id,
+            rs.name if rs else record.get("record_name", type_id),
+            record.get("value", ""),
+            rs.unit if rs else record.get("unit", ""),
+            record.get("note", ""),
+        ])
+
+    connection.send_result(msg["id"], {
+        "csv_content": output.getvalue(),
+        "member_name": coordinator.member_name,
+        "record_count": len(records),
+    })
 
 
 # ============================================================================

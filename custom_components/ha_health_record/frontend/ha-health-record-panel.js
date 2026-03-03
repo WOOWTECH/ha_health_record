@@ -44,6 +44,7 @@ class HaHealthRecordPanel extends HTMLElement {
     // Settings section collapse state
     this.settingsMemberCollapsed = true;
     this.settingsTypesCollapsed = true;
+    this.settingsDataCollapsed = true;
 
     // Calendar filter state
     this._filterDateStart = '';   // ISO date string YYYY-MM-DD
@@ -127,6 +128,11 @@ class HaHealthRecordPanel extends HTMLElement {
         noRecordsYet: 'No records yet',
         recordTypesCount: 'Record Types',
         latestValues: 'Latest Values',
+        // Data Management
+        dataManagementSection: 'Data Management',
+        exportCsv: 'Export CSV',
+        exportNoRecords: 'No records to export',
+        exportingCsv: 'Exporting...',
         // Calendar
         start_date: 'Start Date',
         end_date: 'End Date',
@@ -208,6 +214,11 @@ class HaHealthRecordPanel extends HTMLElement {
         noRecordsYet: '尚無紀錄',
         recordTypesCount: '紀錄類型',
         latestValues: '最新數值',
+        // Data Management
+        dataManagementSection: '資料管理',
+        exportCsv: '匯出 CSV',
+        exportNoRecords: '沒有可匯出的紀錄',
+        exportingCsv: '匯出中...',
         // Calendar
         start_date: '開始日期',
         end_date: '結束日期',
@@ -289,6 +300,11 @@ class HaHealthRecordPanel extends HTMLElement {
         noRecordsYet: '尚无记录',
         recordTypesCount: '记录类型',
         latestValues: '最新数值',
+        // Data Management
+        dataManagementSection: '数据管理',
+        exportCsv: '导出 CSV',
+        exportNoRecords: '没有可导出的记录',
+        exportingCsv: '导出中...',
         // Calendar
         start_date: '开始日期',
         end_date: '结束日期',
@@ -836,6 +852,7 @@ class HaHealthRecordPanel extends HTMLElement {
     const currentTab = this.activeTab;
     const currentMemberCollapsed = this.settingsMemberCollapsed;
     const currentTypesCollapsed = this.settingsTypesCollapsed;
+    const currentDataCollapsed = this.settingsDataCollapsed;
     const panelUrl = '/ha-health-record';
 
     // Wait a bit then try to reload data, with retries
@@ -861,6 +878,7 @@ class HaHealthRecordPanel extends HTMLElement {
         this.activeTab = currentTab;
         this.settingsMemberCollapsed = currentMemberCollapsed;
         this.settingsTypesCollapsed = currentTypesCollapsed;
+        this.settingsDataCollapsed = currentDataCollapsed;
         this._render();
         return; // Success
       } catch (error) {
@@ -2253,6 +2271,24 @@ class HaHealthRecordPanel extends HTMLElement {
     html += this._renderRecordTypesManagement();
     html += '</div>';
 
+    html += '<div class="settings-section-divider"></div>';
+
+    // Data Management section (collapsible)
+    const dataCollapsed = this.settingsDataCollapsed;
+    html += `<div class="settings-section-header ${dataCollapsed ? 'collapsed' : ''}" data-toggle-section="data">
+      ${this._t('dataManagementSection')}
+      <span class="chevron ${dataCollapsed ? 'collapsed' : ''}">▼</span>
+    </div>`;
+    html += `<div class="settings-section-content ${dataCollapsed ? 'collapsed' : ''}">`;
+    if (this.selectedMemberId && this.members.find(m => m.id === this.selectedMemberId)) {
+      html += `<div style="padding: 12px 16px;">
+        <button class="add-button" id="export-csv-btn">${this._t('exportCsv')}</button>
+      </div>`;
+    } else {
+      html += `<div class="empty">${this._t('selectMember')}</div>`;
+    }
+    html += '</div>';
+
     html += '</div>';
     return html;
   }
@@ -2499,6 +2535,8 @@ class HaHealthRecordPanel extends HTMLElement {
           this.settingsMemberCollapsed = !this.settingsMemberCollapsed;
         } else if (section === 'types') {
           this.settingsTypesCollapsed = !this.settingsTypesCollapsed;
+        } else if (section === 'data') {
+          this.settingsDataCollapsed = !this.settingsDataCollapsed;
         }
         this._render();
       });
@@ -2671,6 +2709,12 @@ class HaHealthRecordPanel extends HTMLElement {
         this._showDeleteRecordConfirm(record);
       });
     });
+
+    // Export CSV button
+    const exportCsvBtn = this.shadowRoot.querySelector('#export-csv-btn');
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener('click', () => this._exportCsv());
+    }
 
     // Type management - Edit buttons
     this.shadowRoot.querySelectorAll('.edit-type-btn').forEach(btn => {
@@ -2865,6 +2909,45 @@ class HaHealthRecordPanel extends HTMLElement {
       deleteDialogOverlay.addEventListener('click', (e) => {
         if (e.target === deleteDialogOverlay) this._closeDeleteConfirm();
       });
+    }
+  }
+
+  async _exportCsv() {
+    if (!this.selectedMemberId) return;
+
+    try {
+      const result = await this._hass.callWS({
+        type: 'ha_health_record/export_csv',
+        member_id: this.selectedMemberId,
+      });
+
+      if (!result.record_count) {
+        alert(this._t('exportNoRecords'));
+        return;
+      }
+
+      // Sanitize member name for filename: keep alphanumeric, CJK, spaces→underscore
+      const safeName = result.member_name
+        .replace(/[^\w\u4e00-\u9fff\u3400-\u4dbf\s-]/g, '')
+        .replace(/\s+/g, '_');
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `health_record_${safeName}_${dateStr}.csv`;
+
+      // Prepend UTF-8 BOM for Excel CJK compatibility
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + result.csv_content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('CSV export failed:', error);
+      alert('Export failed: ' + (error.message || error));
     }
   }
 
