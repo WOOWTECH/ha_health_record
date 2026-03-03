@@ -175,7 +175,7 @@ class HaHealthRecordPanel extends HTMLElement {
         recordType: '紀錄類型',
         selectRecordType: '選擇紀錄類型',
         addRecordType: '+ 新增紀錄類型',
-        addMember: '+ 新增成員',
+        addMember: '新增成員',
         save: '儲存',
         saving: '儲存中...',
         cancel: '取消',
