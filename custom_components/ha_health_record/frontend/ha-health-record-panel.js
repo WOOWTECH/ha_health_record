@@ -316,6 +316,8 @@ class HaHealthRecordPanel extends HTMLElement {
       },
     };
 
+    this._lastLanguage = null;
+
     // Wide fallback range so initial load fetches all records
     this.startDate = '2000-01-01T00:00:00';
     this.endDate = '2099-12-31T23:59:59';
@@ -334,9 +336,9 @@ class HaHealthRecordPanel extends HTMLElement {
     return str;
   }
 
-  // Get current language, with fallback
+  // Get current language, with fallback (Profile Language takes priority)
   _getLanguage() {
-    const locale = this._hass?.locale?.language || navigator.language || 'en';
+    const locale = this._hass?.language || this._hass?.locale?.language || navigator.language || 'en';
     // Check for exact match first
     if (this._strings[locale]) return locale;
     // Check for language prefix (e.g., 'zh-TW' -> 'zh-Hant')
@@ -348,8 +350,17 @@ class HaHealthRecordPanel extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    if (hass && this.members.length === 0) {
-      this._loadData();
+    if (hass) {
+      const currentLang = this._getLanguage();
+      if (this._lastLanguage === null) {
+        this._lastLanguage = currentLang;
+      } else if (currentLang !== this._lastLanguage) {
+        this._lastLanguage = currentLang;
+        this._render();
+      }
+      if (this.members.length === 0) {
+        this._loadData();
+      }
     }
   }
 

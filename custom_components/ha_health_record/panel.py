@@ -76,6 +76,11 @@ async def async_setup_panel(hass: HomeAssistant) -> None:
         config={},
     )
 
+    # Register sidebar title i18n script (runs on every page)
+    frontend.add_extra_js_url(
+        hass, f"{FRONTEND_SCRIPT_PATH}/sidebar-title.js?v={cache_buster}"
+    )
+
     _LOGGER.info("Registered Ha Health Record panel")
 
 
